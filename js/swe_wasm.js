@@ -1,141 +1,87 @@
 /**
- * swe_wasm.js — Swiss Ephemeris WASM Wrapper
+ * swe_wasm.js — Swiss Ephemeris Wrapper (prolaxu/swisseph-wasm compatible)
  *
- * This file wraps the Swiss Ephemeris compiled WASM module.
- * It expects:
- *   - /wasm/swe.js   (Emscripten glue code)
- *   - /wasm/swe.wasm (compiled binary)
- *   - /ephe/*.se1    (ephemeris data files)
+ * Compatible with: https://github.com/prolaxu/swisseph-wasm
+ * Files needed in /wasm/:
+ *   swisseph.js   → rename to swe.js
+ *   swisseph.wasm → rename to swe.wasm
  *
- * If WASM files are absent, init() rejects with a clear error.
- * No fake/mock data is silently used in production mode.
- *
- * Swiss Ephemeris Planet IDs (SE_* constants):
- *   0 = Sun, 1 = Moon, 2 = Mercury, 3 = Venus, 4 = Mars
- *   5 = Jupiter, 6 = Saturn, 11 = True Node (Rahu)
- *
- * Ayanamsa mode for Lahiri/Chitrapaksha = 1 (SE_SIDM_LAHIRI)
+ * API used:
+ *   new SwissEph() → swe.initSwissEph() → swe.julday() → swe.calc_ut()
+ *   swe.set_sid_mode() → swe.get_ayanamsa_ut() → swe.rise_trans()
  */
 
 'use strict';
 
 class SwissEphemerisEngine {
   constructor() {
-    this._module   = null;   // Emscripten module instance
-    this._ready    = false;
-    this._mockMode = false;  // NEVER enable in production
-    this._ayanamsaMode = 1;  // SE_SIDM_LAHIRI = 1
-
-    // Emscripten wrapped C functions (set after init)
-    this._swe_julday       = null;
-    this._swe_calc_ut      = null;
-    this._swe_get_ayanamsa_ut = null;
-    this._swe_rise_trans   = null;
-    this._swe_set_ephe_path = null;
-    this._swe_set_sid_mode  = null;
-    this._swe_close        = null;
+    this._swe   = null;   // SwissEph instance from prolaxu library
+    this._ready = false;
   }
 
   /**
-   * Initialize the WASM module.
-   * @param {object} options
-   * @param {string} options.ephePath  path to ephemeris files, e.g. './ephe/'
-   * @returns {Promise<void>}
+   * Initialize the WASM engine.
+   * Loads wasm/swe.js (renamed from swisseph.js).
    */
-  async init({ ephePath = './ephe/' } = {}) {
-    // Check if swe.js loader script is already in the DOM
+  async init() {
+    // Load the JS wrapper script if not already loaded
     if (typeof SwissEph === 'undefined') {
-      // Try to dynamically load the WASM glue script
       await this._loadScript('./wasm/swe.js').catch(() => {
         throw new Error(
           '❌ Swiss Ephemeris WASM files missing.\n' +
-          'High-accuracy calculation cannot run.\n' +
-          'Please add wasm/swe.js and wasm/swe.wasm files.\n' +
-          'See wasm/README.md for compilation instructions.'
+          'Please add these files to your /wasm/ folder:\n' +
+          '  swisseph.js  → rename to → swe.js\n' +
+          '  swisseph.wasm → rename to → swe.wasm\n' +
+          'Download from: https://github.com/prolaxu/swisseph-wasm/tree/main/wasm\n' +
+          'See wasm/README.md for full instructions.'
         );
       });
     }
 
     if (typeof SwissEph === 'undefined') {
-      throw new Error(
-        '❌ Swiss Ephemeris WASM failed to load.\n' +
-        'wasm/swe.js did not export a SwissEph factory function.'
-      );
+      throw new Error('❌ SwissEph class not found after loading wasm/swe.js');
     }
 
-    // Instantiate the Emscripten module
-    this._module = await SwissEph({
-      locateFile: (filename) => `./wasm/${filename}`
-    });
+    // Create instance and initialize
+    this._swe = new SwissEph();
+    await this._swe.initSwissEph();
 
-    // Bind C functions via cwrap
-    this._swe_julday = this._module.cwrap('swe_julday', 'number',
-      ['number','number','number','number','number']);
-    this._swe_calc_ut = this._module.cwrap('swe_calc_ut', 'number',
-      ['number','number','number','number','number']);
-    this._swe_get_ayanamsa_ut = this._module.cwrap('swe_get_ayanamsa_ut', 'number',
-      ['number']);
-    this._swe_rise_trans = this._module.cwrap('swe_rise_trans', 'number',
-      ['number','number','number','number','number','number','number','number','number','number']);
-    this._swe_set_ephe_path = this._module.cwrap('swe_set_ephe_path', null, ['string']);
-    this._swe_set_sid_mode  = this._module.cwrap('swe_set_sid_mode',  null, ['number','number','number']);
-    this._swe_close         = this._module.cwrap('swe_close',         null, []);
-
-    // Set ephemeris path and ayanamsa mode
-    this._swe_set_ephe_path(ephePath);
-    this._swe_set_sid_mode(this._ayanamsaMode, 0, 0);
+    // Set Lahiri ayanamsa (SE_SIDM_LAHIRI = 1)
+    this._swe.set_sid_mode(this._swe.SE_SIDM_LAHIRI, 0, 0);
 
     this._ready = true;
-    console.log('[SwissEph] Engine ready. Ephemeris path:', ephePath);
+    console.log('[SwissEph] Engine ready. Lahiri ayanamsa set.');
   }
 
-  /**
-   * Dynamically load a JS script and wait for it.
-   * @param {string} src
-   * @returns {Promise<void>}
-   */
+  /** Dynamically load a script tag */
   _loadScript(src) {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = src;
       script.onload  = resolve;
-      script.onerror = () => reject(new Error(`Failed to load: ${src}`));
+      script.onerror = () => reject(new Error(`Cannot load: ${src}`));
       document.head.appendChild(script);
     });
   }
 
-  /** Set ephemeris data file path */
-  setEphemerisPath(path) {
-    if (this._swe_set_ephe_path) this._swe_set_ephe_path(path);
-  }
-
-  /** Set ayanamsa mode (1 = Lahiri) */
-  setAyanamsa(mode = 1) {
-    this._ayanamsaMode = mode;
-    if (this._swe_set_sid_mode) this._swe_set_sid_mode(mode, 0, 0);
-  }
-
   /**
-   * Convert Unix epoch seconds to Julian Day Number (UT).
-   * JD = epoch/86400 + 2440587.5
-   * @param {number} epochSeconds
-   * @returns {number} Julian Day Number
+   * Convert Unix epoch seconds → Julian Day Number (UT).
+   * Formula: JD = epoch/86400 + 2440587.5
    */
   calculateJulianDayFromUnix(epochSeconds) {
     return epochSeconds / 86400.0 + 2440587.5;
   }
 
   /**
-   * Calculate sidereal planet longitudes for a given epoch.
+   * Calculate sidereal Lahiri planet longitudes for a given UTC epoch.
    *
-   * Swiss Ephemeris flag values:
-   *   SEFLG_SWIEPH    = 2      (use Swiss Ephemeris files)
-   *   SEFLG_SIDEREAL  = 64     (sidereal mode, uses set ayanamsa)
-   *   SEFLG_TRUENODE  = 256    (true node for Rahu, not mean node)
-   *
-   * Planet IDs:
+   * Planet IDs (from SwissEph constants):
    *   SE_SUN=0, SE_MOON=1, SE_MERCURY=2, SE_VENUS=3, SE_MARS=4
    *   SE_JUPITER=5, SE_SATURN=6, SE_TRUE_NODE=11
+   *
+   * Flags:
+   *   SEFLG_SWIEPH=2   → use bundled WASM ephemeris
+   *   SEFLG_SIDEREAL=64 → sidereal mode (uses set ayanamsa = Lahiri)
    *
    * @param {number} epochSeconds  UTC epoch seconds
    * @returns {{ sun_lon, moon_lon, mars_lon, mercury_lon, jupiter_lon, venus_lon, saturn_lon, rahu_lon, ketu_lon }}
@@ -143,72 +89,57 @@ class SwissEphemerisEngine {
   calculatePlanetLongitudes(epochSeconds) {
     if (!this._ready) throw new Error('Engine not initialized. Call init() first.');
 
-    const jd = this.calculateJulianDayFromUnix(epochSeconds);
+    const swe = this._swe;
+    const jd  = this.calculateJulianDayFromUnix(epochSeconds);
 
-    // Flags: sidereal + Swiss Ephemeris files + true node
-    const SEFLG_SWIEPH   = 2;
-    const SEFLG_SIDEREAL = 64;
-    const SEFLG_TRUENODE = 256;  // used for Rahu (true node vs mean node)
-    const sidFlag  = SEFLG_SWIEPH | SEFLG_SIDEREAL;
-    const nodeFlag = sidFlag | SEFLG_TRUENODE;
+    // Sidereal flag = SEFLG_SWIEPH | SEFLG_SIDEREAL
+    const sidFlag = swe.SEFLG_SWIEPH | swe.SEFLG_SIDEREAL;
 
+    // Planet list: [id, result_key]
     const planets = [
-      { id: 0,  key: 'sun_lon',     flag: sidFlag  },
-      { id: 1,  key: 'moon_lon',    flag: sidFlag  },
-      { id: 4,  key: 'mars_lon',    flag: sidFlag  },
-      { id: 2,  key: 'mercury_lon', flag: sidFlag  },
-      { id: 5,  key: 'jupiter_lon', flag: sidFlag  },
-      { id: 3,  key: 'venus_lon',   flag: sidFlag  },
-      { id: 6,  key: 'saturn_lon',  flag: sidFlag  },
-      { id: 11, key: 'rahu_lon',    flag: nodeFlag },
+      [swe.SE_SUN,       'sun_lon'],
+      [swe.SE_MOON,      'moon_lon'],
+      [swe.SE_MARS,      'mars_lon'],
+      [swe.SE_MERCURY,   'mercury_lon'],
+      [swe.SE_JUPITER,   'jupiter_lon'],
+      [swe.SE_VENUS,     'venus_lon'],
+      [swe.SE_SATURN,    'saturn_lon'],
+      [swe.SE_TRUE_NODE, 'rahu_lon'],  // True Node = Rahu
     ];
-
-    // Allocate output buffer (6 doubles = 48 bytes for xx array)
-    const xxPtr = this._module._malloc(6 * 8);
-    const errPtr = this._module._malloc(256);
 
     const result = {};
 
-    try {
-      for (const { id, key, flag } of planets) {
-        const ret = this._swe_calc_ut(jd, id, flag, xxPtr, errPtr);
-        if (ret < 0) {
-          const errMsg = this._module.UTF8ToString(errPtr);
-          console.warn(`[SwissEph] Planet ${id} calc warning: ${errMsg}`);
-        }
-        // xx[0] = longitude (degrees)
-        const lon = this._module.getValue(xxPtr, 'double');
-        result[key] = this._normalize360(lon);
-      }
-    } finally {
-      this._module._free(xxPtr);
-      this._module._free(errPtr);
+    for (const [id, key] of planets) {
+      const pos = swe.calc_ut(jd, id, sidFlag);
+      // pos[0] = longitude, pos[1] = latitude, pos[2] = distance
+      result[key] = this._normalize360(pos[0]);
     }
 
-    // Ketu is exactly opposite Rahu (180° apart)
+    // Ketu = exactly opposite Rahu
     result.ketu_lon = this._normalize360(result.rahu_lon + 180);
 
     return result;
   }
 
   /**
-   * Calculate Lahiri ayanamsa for a given epoch.
+   * Calculate Lahiri ayanamsa for a given UTC epoch.
    * @param {number} epochSeconds
    * @returns {number} ayanamsa in degrees
    */
   calculateAyanamsa(epochSeconds) {
     if (!this._ready) throw new Error('Engine not initialized.');
     const jd = this.calculateJulianDayFromUnix(epochSeconds);
-    return this._swe_get_ayanamsa_ut(jd);
+    return this._swe.get_ayanamsa_ut(jd);
   }
 
   /**
-   * Calculate sunrise and sunset for a local date at a given location.
+   * Calculate sunrise and sunset for a local date.
+   * Returns "HH:mm" strings in the given timezone.
    *
-   * Uses swe_rise_trans with SE_CALC_RISE and SE_CALC_SET.
-   * Returns times as "HH:mm" strings in local timezone.
+   * Uses swe.rise_trans() with:
+   *   rsmi=1 (SE_CALC_RISE), rsmi=2 (SE_CALC_SET)
    *
-   * @param {string} dateStr   "YYYY-MM-DD" (local date)
+   * @param {string} dateStr   "YYYY-MM-DD"
    * @param {number} latitude
    * @param {number} longitude
    * @param {string} timeZone  IANA timezone
@@ -217,97 +148,93 @@ class SwissEphemerisEngine {
   calculateSunriseSunset(dateStr, latitude, longitude, timeZone) {
     if (!this._ready) throw new Error('Engine not initialized.');
 
+    const swe = this._swe;
     const [year, month, day] = dateStr.split('-').map(Number);
-    // JD for noon UTC on that calendar date (safe starting point for rise/set search)
-    const jdNoon = this._swe_julday(year, month, day, 12.0, 1); // 1 = SE_GREG_CAL
 
-    const SE_CALC_RISE = 1;
-    const SE_CALC_SET  = 2;
-    const SE_SUN       = 0;
-    const SEFLG_SWIEPH = 2;
-    const SEFLG_TOPOCTR = 32768; // topocentric (for surface sunrise)
-    const atmo  = 1013.25;  // standard atmospheric pressure (mbar)
-    const temp  = 15.0;     // standard temperature (°C)
+    // JD for noon UTC on that date (safe starting point for rise/set search)
+    const jdNoon = swe.julday(year, month, day, 12.0);
 
-    const tRetPtr = this._module._malloc(8);  // double for result time
-    const errPtr  = this._module._malloc(256);
+    // geopos array: [longitude, latitude, altitude]
+    const geopos = [longitude, latitude, 0];
+
+    const atpress = 1013.25;  // standard atmosphere
+    const attemp  = 15.0;     // standard temperature °C
 
     let sunrise = 'N/A';
     let sunset  = 'N/A';
 
     try {
-      // Sunrise
-      let ret = this._swe_rise_trans(
-        jdNoon - 0.5,   // start search from previous midnight
-        SE_SUN, 0,
-        SEFLG_SWIEPH,
-        SE_CALC_RISE,
-        longitude, latitude, 0,  // lon, lat, altitude
-        atmo, temp,
-        tRetPtr, errPtr
+      // SE_CALC_RISE = 1
+      const riseResult = swe.rise_trans(
+        jdNoon - 0.5,   // start from midnight
+        swe.SE_SUN,
+        '',             // no star name
+        swe.SEFLG_SWIEPH,
+        1,              // SE_CALC_RISE
+        geopos,
+        atpress,
+        attemp
       );
-
-      if (ret >= 0) {
-        const jdRise = this._module.getValue(tRetPtr, 'double');
-        sunrise = this._jdToLocalTime(jdRise, timeZone);
+      if (riseResult && riseResult.tret && riseResult.tret[0]) {
+        sunrise = this._jdToLocalTime(riseResult.tret[0], timeZone);
       }
+    } catch (e) {
+      console.warn('[SwissEph] Sunrise calc failed:', e.message);
+    }
 
-      // Sunset
-      ret = this._swe_rise_trans(
+    try {
+      // SE_CALC_SET = 2
+      const setResult = swe.rise_trans(
         jdNoon - 0.5,
-        SE_SUN, 0,
-        SEFLG_SWIEPH,
-        SE_CALC_SET,
-        longitude, latitude, 0,
-        atmo, temp,
-        tRetPtr, errPtr
+        swe.SE_SUN,
+        '',
+        swe.SEFLG_SWIEPH,
+        2,              // SE_CALC_SET
+        geopos,
+        atpress,
+        attemp
       );
-
-      if (ret >= 0) {
-        const jdSet = this._module.getValue(tRetPtr, 'double');
-        sunset = this._jdToLocalTime(jdSet, timeZone);
+      if (setResult && setResult.tret && setResult.tret[0]) {
+        sunset = this._jdToLocalTime(setResult.tret[0], timeZone);
       }
-    } finally {
-      this._module._free(tRetPtr);
-      this._module._free(errPtr);
+    } catch (e) {
+      console.warn('[SwissEph] Sunset calc failed:', e.message);
     }
 
     return { sunrise, sunset };
   }
 
   /**
-   * Convert a Julian Day number to local time string "HH:mm" in given timezone.
-   * @param {number} jd
-   * @param {string} timeZone
-   * @returns {string}
+   * Convert Julian Day → local "HH:mm" string in given timezone.
    */
   _jdToLocalTime(jd, timeZone) {
     const epochMs = (jd - 2440587.5) * 86400000;
     const d = new Date(epochMs);
     const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone,
-      hour: '2-digit', minute: '2-digit', hour12: false
+      hour:   '2-digit',
+      minute: '2-digit',
+      hour12: false
     }).formatToParts(d);
     const h = parts.find(p => p.type === 'hour').value;
     const m = parts.find(p => p.type === 'minute').value;
     return `${h}:${m}`;
   }
 
-  /**
-   * Normalize a longitude value to [0, 360).
-   * @param {number} deg
-   * @returns {number}
-   */
+  /** Normalize degrees to [0, 360) */
   _normalize360(deg) {
     deg = deg % 360;
     if (deg < 0) deg += 360;
     return deg;
   }
 
-  /** Clean up WASM resources */
+  /** Clean up */
   close() {
-    if (this._swe_close) this._swe_close();
+    if (this._swe) {
+      try { this._swe.close(); } catch(e) {}
+    }
     this._ready = false;
+    this._swe   = null;
   }
 }
 

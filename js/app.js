@@ -1,25 +1,12 @@
 /**
  * app.js — Main Application Controller
  *
- * Orchestrates:
- *  1. Load config files (location.json, profile.json)
- *  2. Load i18n files
- *  3. Initialize Swiss Ephemeris WASM engine
- *  4. Generate D1–D60 minute timestamps
- *  5. For each minute: compute planet longitudes → panchang → CSV row
- *  6. Batch processing to keep UI responsive
- *  7. Progress bar updates
- *  8. CSV download on completion
- *
- * Dependencies (must be loaded before app.js):
- *   time.js, swe_wasm.js, panchang.js, export_csv.js, i18n.js
+ * Compatible with prolaxu/swisseph-wasm library.
+ * Dependencies: time.js, swe_wasm.js, panchang.js, export_csv.js, i18n.js
  */
 
 'use strict';
 
-// ============================================================
-// CONFIG DEFAULTS (overridden by JSON files if available)
-// ============================================================
 const DEFAULT_LOCATION = {
   name:      'NYSE / Wall Street',
   latitude:  40.7069,
@@ -37,23 +24,17 @@ const DEFAULT_PROFILE = {
 };
 
 const CSV_FILENAME = 'NYSE_D1-D60_1min_panchang_vedic_hi-en.csv';
-const BATCH_SIZE   = 300;  // rows per async batch
+const BATCH_SIZE   = 300;
 
-// ============================================================
-// STATE
-// ============================================================
-let location = { ...DEFAULT_LOCATION };
-let profile  = { ...DEFAULT_PROFILE };
-let engine   = null;
+let location  = { ...DEFAULT_LOCATION };
+let profile   = { ...DEFAULT_PROFILE };
+let engine    = null;
 let isRunning = false;
 
-// Per-day cache for sunrise/sunset (expensive to compute every minute)
-// Key: "YYYY-MM-DD", Value: { sunrise, sunset }
+// Per-day sunrise/sunset cache (avoid recalculating every minute)
 const sunriseSunsetCache = {};
 
-// ============================================================
-// UI HELPERS
-// ============================================================
+// ── UI Helpers ──────────────────────────────────────────────
 
 function setStatus(msg, isError = false) {
   const el = document.getElementById('status-msg');
@@ -68,10 +49,12 @@ function setProgress(current, total) {
   const bar     = document.getElementById('progress-bar');
   const label   = document.getElementById('progress-label');
   const counter = document.getElementById('progress-counter');
+  const track   = document.querySelector('.progress-track');
 
   if (bar)     bar.style.width = pct + '%';
   if (label)   label.textContent = pct + '%';
   if (counter) counter.textContent = `${current.toLocaleString()} / ${total.toLocaleString()} rows`;
+  if (track)   track.setAttribute('aria-valuenow', pct);
 }
 
 function setCurrentTs(localStr) {
@@ -82,13 +65,11 @@ function setCurrentTs(localStr) {
 function setButtonState(generating) {
   const btn = document.getElementById('generate-btn');
   if (!btn) return;
-  btn.disabled   = generating;
+  btn.disabled    = generating;
   btn.textContent = generating ? 'Generating… please wait' : 'Generate D1–D60 CSV';
 }
 
-// ============================================================
-// CONFIG LOADERS
-// ============================================================
+// ── Config Loaders ──────────────────────────────────────────
 
 async function loadJson(path, fallback) {
   try {
@@ -96,7 +77,7 @@ async function loadJson(path, fallback) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (e) {
-    console.warn(`[App] Could not load ${path}, using defaults:`, e.message);
+    console.warn(`[App] Using default for ${path}:`, e.message);
     return fallback;
   }
 }
@@ -108,25 +89,13 @@ async function loadConfigs() {
   ]);
 }
 
-// ============================================================
-// SUNRISE / SUNSET CACHE
-// ============================================================
+// ── Sunrise/Sunset Cache ────────────────────────────────────
 
-/**
- * Get sunrise/sunset for a date, using per-day cache.
- * @param {string} dateStr  "YYYY-MM-DD"
- * @returns {{ sunrise: string, sunset: string }}
- */
 function getSunriseSunset(dateStr) {
-  if (sunriseSunsetCache[dateStr]) {
-    return sunriseSunsetCache[dateStr];
-  }
+  if (sunriseSunsetCache[dateStr]) return sunriseSunsetCache[dateStr];
   try {
     const result = engine.calculateSunriseSunset(
-      dateStr,
-      location.latitude,
-      location.longitude,
-      location.timezone
+      dateStr, location.latitude, location.longitude, location.timezone
     );
     sunriseSunsetCache[dateStr] = result;
     return result;
@@ -138,137 +107,115 @@ function getSunriseSunset(dateStr) {
   }
 }
 
-// ============================================================
-// ROW BUILDER
-// ============================================================
+// ── Row Builder ─────────────────────────────────────────────
 
-/**
- * Build a single CSV row object from a timestamp entry.
- * @param {object} ts  — from TimeEngine.generateMinuteRange()
- * @returns {object}   — matching CsvExporter column order
- */
 function buildRow(ts) {
   const { epochSeconds, localStr, dateStr, weekdayIndex } = ts;
 
-  // 1. Planet longitudes (sidereal Lahiri)
+  // Planet longitudes (sidereal Lahiri)
   const lons = engine.calculatePlanetLongitudes(epochSeconds);
 
-  // 2. Ayanamsa
+  // Ayanamsa
   const ayanamsaDeg = engine.calculateAyanamsa(epochSeconds);
 
-  // 3. Panchang
+  // Panchang
   const panchang = PanchangEngine.computePanchang({
     sun_lon:  lons.sun_lon,
     moon_lon: lons.moon_lon
   });
 
-  // 4. Sunrise/sunset (cached per day)
+  // Sunrise/sunset (cached per day)
   const { sunrise, sunset } = getSunriseSunset(dateStr);
 
-  // 5. Kaal flags
+  // Kaal flags
   const kaalFlags = PanchangEngine.computeKaalFlags({
-    localStr,
-    sunrise,
-    sunset,
-    weekdayIndex
+    localStr, sunrise, sunset, weekdayIndex
   });
 
-  // 6. i18n names
-  const weekdayNames  = I18n.weekday(weekdayIndex);
-  const tithiNames    = I18n.tithi(panchang.tithi_id);
-  const pakshaNames   = I18n.paksha(panchang.paksha);
+  // i18n names
+  const weekdayNames   = I18n.weekday(weekdayIndex);
+  const tithiNames     = I18n.tithi(panchang.tithi_id);
+  const pakshaNames    = I18n.paksha(panchang.paksha);
   const nakshatraNames = I18n.nakshatra(panchang.nakshatra_id);
-  const yogaNames     = I18n.yoga(panchang.yoga_id);
-  const karanaNames   = I18n.karana(panchang.karana_key);
+  const yogaNames      = I18n.yoga(panchang.yoga_id);
+  const karanaNames    = I18n.karana(panchang.karana_key);
 
   return {
-    ts_local:      localStr,
-    ts_utc:        epochSeconds,
-    timezone:      location.timezone,
-    latitude:      location.latitude,
-    longitude:     location.longitude,
-    weekday_en:    weekdayNames.en,
-    weekday_hi:    weekdayNames.hi,
+    ts_local:       localStr,
+    ts_utc:         epochSeconds,
+    timezone:       location.timezone,
+    latitude:       location.latitude,
+    longitude:      location.longitude,
+    weekday_en:     weekdayNames.en,
+    weekday_hi:     weekdayNames.hi,
 
-    tithi_id:      panchang.tithi_id,
-    tithi_en:      tithiNames.en,
-    tithi_hi:      tithiNames.hi,
-    paksha_en:     pakshaNames.en,
-    paksha_hi:     pakshaNames.hi,
+    tithi_id:       panchang.tithi_id,
+    tithi_en:       tithiNames.en,
+    tithi_hi:       tithiNames.hi,
+    paksha_en:      pakshaNames.en,
+    paksha_hi:      pakshaNames.hi,
 
-    nakshatra_id:  panchang.nakshatra_id,
-    nakshatra_en:  nakshatraNames.en,
-    nakshatra_hi:  nakshatraNames.hi,
+    nakshatra_id:   panchang.nakshatra_id,
+    nakshatra_en:   nakshatraNames.en,
+    nakshatra_hi:   nakshatraNames.hi,
 
-    yoga_id:       panchang.yoga_id,
-    yoga_en:       yogaNames.en,
-    yoga_hi:       yogaNames.hi,
+    yoga_id:        panchang.yoga_id,
+    yoga_en:        yogaNames.en,
+    yoga_hi:        yogaNames.hi,
 
-    karana_id:     panchang.karana_id,
-    karana_en:     karanaNames.en,
-    karana_hi:     karanaNames.hi,
+    karana_id:      panchang.karana_id,
+    karana_en:      karanaNames.en,
+    karana_hi:      karanaNames.hi,
 
-    ayanamsa_name: 'Lahiri',
-    ayanamsa_deg:  ayanamsaDeg.toFixed(6),
+    ayanamsa_name:  'Lahiri',
+    ayanamsa_deg:   ayanamsaDeg.toFixed(6),
 
-    sun_lon:       lons.sun_lon.toFixed(6),
-    moon_lon:      lons.moon_lon.toFixed(6),
-    mars_lon:      lons.mars_lon.toFixed(6),
-    mercury_lon:   lons.mercury_lon.toFixed(6),
-    jupiter_lon:   lons.jupiter_lon.toFixed(6),
-    venus_lon:     lons.venus_lon.toFixed(6),
-    saturn_lon:    lons.saturn_lon.toFixed(6),
-    rahu_lon:      lons.rahu_lon.toFixed(6),
-    ketu_lon:      lons.ketu_lon.toFixed(6),
+    sun_lon:        lons.sun_lon.toFixed(6),
+    moon_lon:       lons.moon_lon.toFixed(6),
+    mars_lon:       lons.mars_lon.toFixed(6),
+    mercury_lon:    lons.mercury_lon.toFixed(6),
+    jupiter_lon:    lons.jupiter_lon.toFixed(6),
+    venus_lon:      lons.venus_lon.toFixed(6),
+    saturn_lon:     lons.saturn_lon.toFixed(6),
+    rahu_lon:       lons.rahu_lon.toFixed(6),
+    ketu_lon:       lons.ketu_lon.toFixed(6),
 
-    sunrise_local: sunrise,
-    sunset_local:  sunset,
-    is_rahu_kaal:  kaalFlags.is_rahu_kaal,
+    sunrise_local:  sunrise,
+    sunset_local:   sunset,
+    is_rahu_kaal:   kaalFlags.is_rahu_kaal,
     is_gulika_kaal: kaalFlags.is_gulika_kaal,
-    is_yamaganda:  kaalFlags.is_yamaganda
+    is_yamaganda:   kaalFlags.is_yamaganda
   };
 }
 
-// ============================================================
-// MAIN GENERATION FUNCTION
-// ============================================================
+// ── Main Generation ─────────────────────────────────────────
 
-/**
- * Sleep for N ms — yields control back to browser for UI updates.
- * @param {number} ms
- */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Main CSV generation pipeline.
- * Called when user clicks "Generate D1–D60 CSV".
- */
 async function generateCsv() {
   if (isRunning) return;
   isRunning = true;
   setButtonState(true);
-
-  // Clear sunrise cache for fresh run
   Object.keys(sunriseSunsetCache).forEach(k => delete sunriseSunsetCache[k]);
 
   try {
-    // ── Step 1: Load configs ─────────────────────────────────
+    // Step 1: Configs
     setStatus('Loading configuration…');
     await loadConfigs();
 
-    // ── Step 2: Load i18n ────────────────────────────────────
+    // Step 2: i18n
     setStatus('Loading language files…');
     await I18n.init();
 
-    // ── Step 3: Init WASM engine ─────────────────────────────
+    // Step 3: WASM Engine
     setStatus('Loading Swiss Ephemeris engine…');
     engine = new SwissEphemerisEngine();
-    await engine.init({ ephePath: './ephe/' });
+    await engine.init();
     setStatus('Engine ready. Generating timestamps…');
 
-    // ── Step 4: Generate timestamps ──────────────────────────
+    // Step 4: Timestamps
     const today = TimeEngine.getTodayInTimeZone(location.timezone);
     const timestamps = TimeEngine.generateMinuteRange({
       timeZone:     location.timezone,
@@ -278,10 +225,10 @@ async function generateCsv() {
     });
 
     const totalRows = timestamps.length;
-    setStatus(`Processing ${totalRows.toLocaleString()} rows…`);
+    setStatus(`Processing ${totalRows.toLocaleString()} rows… (this may take several minutes)`);
     setProgress(0, totalRows);
 
-    // ── Step 5: Build CSV in batches ─────────────────────────
+    // Step 5: Build CSV in batches
     const csvLines = [CsvExporter.buildCsvHeader()];
     let processed  = 0;
 
@@ -295,17 +242,15 @@ async function generateCsv() {
         processed++;
       }
 
-      // Update progress and yield to browser
       setProgress(processed, totalRows);
-      await sleep(0);
+      await sleep(0);  // yield to browser for UI update
     }
 
-    // ── Step 6: Download ─────────────────────────────────────
+    // Step 6: Download
     setStatus('CSV ready! Starting download…');
     CsvExporter.downloadCsv(CSV_FILENAME, csvLines);
-
     setProgress(totalRows, totalRows);
-    setStatus(`✅ Done! ${totalRows.toLocaleString()} rows downloaded as ${CSV_FILENAME}`);
+    setStatus(`✅ Done! ${totalRows.toLocaleString()} rows → ${CSV_FILENAME}`);
 
   } catch (err) {
     console.error('[App] Error:', err);
@@ -314,26 +259,19 @@ async function generateCsv() {
   } finally {
     isRunning = false;
     setButtonState(false);
-    if (engine) {
-      engine.close();
-      engine = null;
-    }
+    if (engine) { engine.close(); engine = null; }
   }
 }
 
-// ============================================================
-// DOM READY
-// ============================================================
+// ── DOM Ready ───────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('generate-btn');
-  if (btn) {
-    btn.addEventListener('click', generateCsv);
-  }
+  if (btn) btn.addEventListener('click', generateCsv);
 
-  // Show default location info
   const locEl = document.getElementById('info-location');
-  if (locEl) locEl.textContent = `${DEFAULT_LOCATION.name} (${DEFAULT_LOCATION.latitude}, ${DEFAULT_LOCATION.longitude})`;
+  if (locEl) locEl.textContent =
+    `${DEFAULT_LOCATION.name} (${DEFAULT_LOCATION.latitude}, ${DEFAULT_LOCATION.longitude})`;
 
   const tzEl = document.getElementById('info-timezone');
   if (tzEl) tzEl.textContent = DEFAULT_LOCATION.timezone;

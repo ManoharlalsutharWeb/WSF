@@ -4,12 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0f1a" />
-  <meta name="description" content="Offline Vedic Panchang + Astrology CSV generator for NYSE/Wall Street. D1–D60, 1-minute resolution. Works offline on Android Chrome." />
-
-  <!-- Prevent any external resource loads -->
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self';" />
-
   <title>Panchang Offline — NYSE D1–D60 CSV</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -17,15 +11,13 @@
 
 <div class="app-shell">
 
-  <!-- ── Header ──────────────────────────────────────────── -->
   <header class="app-header">
     <span class="header-icon" aria-hidden="true">🪐</span>
     <h1 class="app-title">Offline Panchang + Vedic Astro<br>CSV Generator</h1>
-    <p class="app-subtitle">NYSE / Wall Street &nbsp;·&nbsp; D1–D60 &nbsp;·&nbsp; 1-minute resolution &nbsp;·&nbsp; Hindi + English</p>
+    <p class="app-subtitle">NYSE / Wall Street &nbsp;·&nbsp; D1–D60 &nbsp;·&nbsp; 1-minute &nbsp;·&nbsp; Hindi + English</p>
   </header>
 
-  <!-- ── Location & Profile Info ─────────────────────────── -->
-  <section class="info-card" aria-label="Configuration summary">
+  <section class="info-card">
     <div class="info-card-title">Configuration</div>
     <div class="info-grid">
       <div class="info-item">
@@ -55,10 +47,8 @@
     </div>
   </section>
 
-  <!-- ── Options ─────────────────────────────────────────── -->
-  <section class="options-card" aria-label="Output options">
+  <section class="options-card">
     <div class="options-card-title">Output Options</div>
-
     <div class="option-row">
       <span class="option-label">Graha Longitudes (Sun–Saturn + Rahu/Ketu)</span>
       <span class="option-badge">ON</span>
@@ -68,7 +58,7 @@
       <span class="option-badge">ON</span>
     </div>
     <div class="option-row">
-      <span class="option-label">Sunrise &amp; Sunset (local time)</span>
+      <span class="option-label">Sunrise &amp; Sunset</span>
       <span class="option-badge">ON</span>
     </div>
     <div class="option-row">
@@ -77,134 +67,128 @@
     </div>
   </section>
 
-  <!-- ── WASM Requirement Notice ─────────────────────────── -->
-  <section class="wasm-warning" role="note" aria-label="WASM requirement notice">
-    <div class="wasm-warning-title">⚠ Swiss Ephemeris WASM Required</div>
-    <div class="wasm-warning-body">
-      High-accuracy calculation requires <code>wasm/swe.js</code> and <code>wasm/swe.wasm</code>
-      compiled from Swiss Ephemeris C source, plus ephemeris data files in <code>ephe/</code>.
-      See <code>wasm/README.md</code> for compilation instructions.
-      If files are missing, generation will fail with a clear error — no fake data is used.
-    </div>
-  </section>
-
-  <!-- ── Generate Button ─────────────────────────────────── -->
   <section class="generate-section">
-    <button id="generate-btn" type="button" aria-live="polite">
-      Generate D1–D60 CSV
-    </button>
+    <button id="generate-btn" type="button">Generate D1–D60 CSV</button>
   </section>
 
-  <!-- ── Status Message ──────────────────────────────────── -->
-  <section class="status-section" aria-live="polite" aria-atomic="true">
+  <section class="status-section" aria-live="polite">
     <div id="status-msg" class="status" role="status">
-      Ready. Press the button above to start generating the CSV.
+      Ready. Press the button above to start.
     </div>
   </section>
 
-  <!-- ── Progress ────────────────────────────────────────── -->
-  <section class="progress-section" aria-label="Generation progress">
+  <section class="progress-section">
     <div class="progress-header">
       <span class="progress-title">Progress</span>
-      <span id="progress-label" aria-live="polite">0%</span>
+      <span id="progress-label">0%</span>
     </div>
-
     <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
       <div id="progress-bar"></div>
     </div>
-
     <div class="progress-meta">
       <span id="progress-counter">0 / 0 rows</span>
       <span>
         <span class="current-ts-label">Processing: </span>
-        <span id="current-ts" aria-live="off">—</span>
+        <span id="current-ts">—</span>
       </span>
     </div>
   </section>
 
-  <!-- ── CSV Schema Reference ────────────────────────────── -->
-  <section class="schema-section" aria-label="CSV columns reference">
+  <section class="schema-section">
     <div class="schema-title">CSV Columns</div>
-
     <div class="schema-group">
       <div class="schema-group-label">Time &amp; Location</div>
       <div class="schema-tags">
-        <span class="schema-tag">ts_local</span>
-        <span class="schema-tag">ts_utc</span>
-        <span class="schema-tag">timezone</span>
-        <span class="schema-tag">latitude</span>
-        <span class="schema-tag">longitude</span>
-        <span class="schema-tag">weekday_en</span>
+        <span class="schema-tag">ts_local</span><span class="schema-tag">ts_utc</span>
+        <span class="schema-tag">timezone</span><span class="schema-tag">latitude</span>
+        <span class="schema-tag">longitude</span><span class="schema-tag">weekday_en</span>
         <span class="schema-tag">weekday_hi</span>
       </div>
     </div>
-
     <div class="schema-group">
       <div class="schema-group-label">Panchang (Hindi + English)</div>
       <div class="schema-tags">
-        <span class="schema-tag">tithi_id</span>
-        <span class="schema-tag">tithi_en</span>
-        <span class="schema-tag">tithi_hi</span>
-        <span class="schema-tag">paksha_en</span>
-        <span class="schema-tag">paksha_hi</span>
-        <span class="schema-tag">nakshatra_id</span>
-        <span class="schema-tag">nakshatra_en</span>
-        <span class="schema-tag">nakshatra_hi</span>
-        <span class="schema-tag">yoga_id</span>
-        <span class="schema-tag">yoga_en</span>
-        <span class="schema-tag">yoga_hi</span>
-        <span class="schema-tag">karana_id</span>
-        <span class="schema-tag">karana_en</span>
-        <span class="schema-tag">karana_hi</span>
+        <span class="schema-tag">tithi_id</span><span class="schema-tag">tithi_en</span>
+        <span class="schema-tag">tithi_hi</span><span class="schema-tag">paksha_en</span>
+        <span class="schema-tag">paksha_hi</span><span class="schema-tag">nakshatra_id</span>
+        <span class="schema-tag">nakshatra_en</span><span class="schema-tag">nakshatra_hi</span>
+        <span class="schema-tag">yoga_id</span><span class="schema-tag">yoga_en</span>
+        <span class="schema-tag">yoga_hi</span><span class="schema-tag">karana_id</span>
+        <span class="schema-tag">karana_en</span><span class="schema-tag">karana_hi</span>
       </div>
     </div>
-
     <div class="schema-group">
-      <div class="schema-group-label">Graha Longitudes (Sidereal Lahiri, degrees)</div>
+      <div class="schema-group-label">Graha Longitudes</div>
       <div class="schema-tags">
-        <span class="schema-tag">ayanamsa_name</span>
-        <span class="schema-tag">ayanamsa_deg</span>
-        <span class="schema-tag">sun_lon</span>
-        <span class="schema-tag">moon_lon</span>
-        <span class="schema-tag">mars_lon</span>
-        <span class="schema-tag">mercury_lon</span>
-        <span class="schema-tag">jupiter_lon</span>
-        <span class="schema-tag">venus_lon</span>
-        <span class="schema-tag">saturn_lon</span>
-        <span class="schema-tag">rahu_lon</span>
-        <span class="schema-tag">ketu_lon</span>
+        <span class="schema-tag">ayanamsa_deg</span><span class="schema-tag">sun_lon</span>
+        <span class="schema-tag">moon_lon</span><span class="schema-tag">mars_lon</span>
+        <span class="schema-tag">mercury_lon</span><span class="schema-tag">jupiter_lon</span>
+        <span class="schema-tag">venus_lon</span><span class="schema-tag">saturn_lon</span>
+        <span class="schema-tag">rahu_lon</span><span class="schema-tag">ketu_lon</span>
       </div>
     </div>
-
     <div class="schema-group">
       <div class="schema-group-label">Daily Flags</div>
       <div class="schema-tags">
-        <span class="schema-tag">sunrise_local</span>
-        <span class="schema-tag">sunset_local</span>
-        <span class="schema-tag">is_rahu_kaal</span>
-        <span class="schema-tag">is_gulika_kaal</span>
+        <span class="schema-tag">sunrise_local</span><span class="schema-tag">sunset_local</span>
+        <span class="schema-tag">is_rahu_kaal</span><span class="schema-tag">is_gulika_kaal</span>
         <span class="schema-tag">is_yamaganda</span>
       </div>
     </div>
   </section>
 
-  <!-- ── Footer ──────────────────────────────────────────── -->
   <footer class="app-footer">
     <p class="footer-text">
-      100% offline &nbsp;·&nbsp; No API calls &nbsp;·&nbsp; No data sent anywhere<br>
-      Swiss Ephemeris (WASM) &nbsp;·&nbsp; Lahiri Ayanamsa &nbsp;·&nbsp; True Node
+      100% offline &nbsp;·&nbsp; No API calls &nbsp;·&nbsp; Swiss Ephemeris WASM &nbsp;·&nbsp; Lahiri Ayanamsa
     </p>
   </footer>
 
-</div><!-- /.app-shell -->
+</div>
 
-<!-- Scripts: load in dependency order, no CDN -->
-<script src="js/time.js"></script>
-<script src="js/swe_wasm.js"></script>
-<script src="js/panchang.js"></script>
-<script src="js/export_csv.js"></script>
-<script src="js/i18n.js"></script>
-<script src="js/app.js"></script>
+<!--
+  IMPORTANT: All scripts loaded as type="module" so dynamic import() works.
+  Load order matters — dependencies before app.js.
+-->
+<script type="module">
+  // Import all modules in correct order
+  // These are plain scripts exposed on window — we load them as module to enable
+  // dynamic import() inside swe_wasm.js for ES module WASM library.
+
+  // Load non-module scripts sequentially
+  async function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      // Check if already loaded
+      if (document.querySelector(`script[data-src="${src}"]`)) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.setAttribute('data-src', src);
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function bootApp() {
+    try {
+      await loadScript('./js/time.js');
+      await loadScript('./js/panchang.js');
+      await loadScript('./js/export_csv.js');
+      await loadScript('./js/i18n.js');
+      await loadScript('./js/swe_wasm.js');
+      await loadScript('./js/app.js');
+      console.log('[Boot] All modules loaded OK');
+    } catch(e) {
+      console.error('[Boot] Script load failed:', e);
+      const el = document.getElementById('status-msg');
+      if (el) {
+        el.textContent = '❌ Failed to load app scripts: ' + e.message;
+        el.className = 'status error';
+      }
+    }
+  }
+
+  bootApp();
+</script>
 
 </body>
 </html>

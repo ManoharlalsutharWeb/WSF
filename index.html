@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0f1a" />
+  <meta name="description" content="Offline Vedic Panchang + Astrology CSV generator for NYSE/Wall Street. D1–D60, 1-minute resolution. Works offline on Android Chrome." />
+
+  <!-- Prevent any external resource loads -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self';" />
+
+  <title>Panchang Offline — NYSE D1–D60 CSV</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <header class="app-header">
+    <span class="header-icon" aria-hidden="true">🪐</span>
+    <h1 class="app-title">Offline Panchang + Vedic Astro<br>CSV Generator</h1>
+    <p class="app-subtitle">NYSE / Wall Street &nbsp;·&nbsp; D1–D60 &nbsp;·&nbsp; 1-minute resolution &nbsp;·&nbsp; Hindi + English</p>
+  </header>
+
+  <!-- ── Location & Profile Info ─────────────────────────── -->
+  <section class="info-card" aria-label="Configuration summary">
+    <div class="info-card-title">Configuration</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="info-label">Location</span>
+        <span class="info-value accent" id="info-location">NYSE / Wall Street (40.7069, −74.0113)</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Timezone</span>
+        <span class="info-value accent" id="info-timezone">America/New_York</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Range</span>
+        <span class="info-value gold">D1 → D60 (60 days)</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Resolution</span>
+        <span class="info-value gold">1 minute (~86,400 rows)</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Ayanamsa</span>
+        <span class="info-value">Lahiri / Chitrapaksha</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Rahu/Ketu</span>
+        <span class="info-value">True Node</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Options ─────────────────────────────────────────── -->
+  <section class="options-card" aria-label="Output options">
+    <div class="options-card-title">Output Options</div>
+
+    <div class="option-row">
+      <span class="option-label">Graha Longitudes (Sun–Saturn + Rahu/Ketu)</span>
+      <span class="option-badge">ON</span>
+    </div>
+    <div class="option-row">
+      <span class="option-label">Rahu Kaal / Gulika / Yamaganda Flags</span>
+      <span class="option-badge">ON</span>
+    </div>
+    <div class="option-row">
+      <span class="option-label">Sunrise &amp; Sunset (local time)</span>
+      <span class="option-badge">ON</span>
+    </div>
+    <div class="option-row">
+      <span class="option-label">Language</span>
+      <span class="option-badge gold">Hindi + English</span>
+    </div>
+  </section>
+
+  <!-- ── WASM Requirement Notice ─────────────────────────── -->
+  <section class="wasm-warning" role="note" aria-label="WASM requirement notice">
+    <div class="wasm-warning-title">⚠ Swiss Ephemeris WASM Required</div>
+    <div class="wasm-warning-body">
+      High-accuracy calculation requires <code>wasm/swe.js</code> and <code>wasm/swe.wasm</code>
+      compiled from Swiss Ephemeris C source, plus ephemeris data files in <code>ephe/</code>.
+      See <code>wasm/README.md</code> for compilation instructions.
+      If files are missing, generation will fail with a clear error — no fake data is used.
+    </div>
+  </section>
+
+  <!-- ── Generate Button ─────────────────────────────────── -->
+  <section class="generate-section">
+    <button id="generate-btn" type="button" aria-live="polite">
+      Generate D1–D60 CSV
+    </button>
+  </section>
+
+  <!-- ── Status Message ──────────────────────────────────── -->
+  <section class="status-section" aria-live="polite" aria-atomic="true">
+    <div id="status-msg" class="status" role="status">
+      Ready. Press the button above to start generating the CSV.
+    </div>
+  </section>
+
+  <!-- ── Progress ────────────────────────────────────────── -->
+  <section class="progress-section" aria-label="Generation progress">
+    <div class="progress-header">
+      <span class="progress-title">Progress</span>
+      <span id="progress-label" aria-live="polite">0%</span>
+    </div>
+
+    <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+      <div id="progress-bar"></div>
+    </div>
+
+    <div class="progress-meta">
+      <span id="progress-counter">0 / 0 rows</span>
+      <span>
+        <span class="current-ts-label">Processing: </span>
+        <span id="current-ts" aria-live="off">—</span>
+      </span>
+    </div>
+  </section>
+
+  <!-- ── CSV Schema Reference ────────────────────────────── -->
+  <section class="schema-section" aria-label="CSV columns reference">
+    <div class="schema-title">CSV Columns</div>
+
+    <div class="schema-group">
+      <div class="schema-group-label">Time &amp; Location</div>
+      <div class="schema-tags">
+        <span class="schema-tag">ts_local</span>
+        <span class="schema-tag">ts_utc</span>
+        <span class="schema-tag">timezone</span>
+        <span class="schema-tag">latitude</span>
+        <span class="schema-tag">longitude</span>
+        <span class="schema-tag">weekday_en</span>
+        <span class="schema-tag">weekday_hi</span>
+      </div>
+    </div>
+
+    <div class="schema-group">
+      <div class="schema-group-label">Panchang (Hindi + English)</div>
+      <div class="schema-tags">
+        <span class="schema-tag">tithi_id</span>
+        <span class="schema-tag">tithi_en</span>
+        <span class="schema-tag">tithi_hi</span>
+        <span class="schema-tag">paksha_en</span>
+        <span class="schema-tag">paksha_hi</span>
+        <span class="schema-tag">nakshatra_id</span>
+        <span class="schema-tag">nakshatra_en</span>
+        <span class="schema-tag">nakshatra_hi</span>
+        <span class="schema-tag">yoga_id</span>
+        <span class="schema-tag">yoga_en</span>
+        <span class="schema-tag">yoga_hi</span>
+        <span class="schema-tag">karana_id</span>
+        <span class="schema-tag">karana_en</span>
+        <span class="schema-tag">karana_hi</span>
+      </div>
+    </div>
+
+    <div class="schema-group">
+      <div class="schema-group-label">Graha Longitudes (Sidereal Lahiri, degrees)</div>
+      <div class="schema-tags">
+        <span class="schema-tag">ayanamsa_name</span>
+        <span class="schema-tag">ayanamsa_deg</span>
+        <span class="schema-tag">sun_lon</span>
+        <span class="schema-tag">moon_lon</span>
+        <span class="schema-tag">mars_lon</span>
+        <span class="schema-tag">mercury_lon</span>
+        <span class="schema-tag">jupiter_lon</span>
+        <span class="schema-tag">venus_lon</span>
+        <span class="schema-tag">saturn_lon</span>
+        <span class="schema-tag">rahu_lon</span>
+        <span class="schema-tag">ketu_lon</span>
+      </div>
+    </div>
+
+    <div class="schema-group">
+      <div class="schema-group-label">Daily Flags</div>
+      <div class="schema-tags">
+        <span class="schema-tag">sunrise_local</span>
+        <span class="schema-tag">sunset_local</span>
+        <span class="schema-tag">is_rahu_kaal</span>
+        <span class="schema-tag">is_gulika_kaal</span>
+        <span class="schema-tag">is_yamaganda</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ──────────────────────────────────────────── -->
+  <footer class="app-footer">
+    <p class="footer-text">
+      100% offline &nbsp;·&nbsp; No API calls &nbsp;·&nbsp; No data sent anywhere<br>
+      Swiss Ephemeris (WASM) &nbsp;·&nbsp; Lahiri Ayanamsa &nbsp;·&nbsp; True Node
+    </p>
+  </footer>
+
+</div><!-- /.app-shell -->
+
+<!-- Scripts: load in dependency order, no CDN -->
+<script src="js/time.js"></script>
+<script src="js/swe_wasm.js"></script>
+<script src="js/panchang.js"></script>
+<script src="js/export_csv.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0f1a" />
+  <title>Panchang Offline — NYSE D1–D60 CSV</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <header class="app-header">
+    <span class="header-icon">🪐</span>
+    <h1 class="app-title">Offline Panchang + Vedic Astro<br>CSV Generator</h1>
+    <p class="app-subtitle">NYSE / Wall Street &nbsp;·&nbsp; D1–D60 &nbsp;·&nbsp; 1-minute &nbsp;·&nbsp; Hindi + English</p>
+  </header>
+
+  <section class="info-card">
+    <div class="info-card-title">Configuration</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="info-label">Location</span>
+        <span class="info-value accent">NYSE / Wall Street (40.7069, −74.0113)</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Timezone</span>
+        <span class="info-value accent">America/New_York</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Range</span>
+        <span class="info-value gold">D1 → D60 (60 days)</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Resolution</span>
+        <span class="info-value gold">1 minute (~86,400 rows)</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Ayanamsa</span>
+        <span class="info-value">Lahiri / Chitrapaksha</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Rahu/Ketu</span>
+        <span class="info-value">True Node</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="generate-section">
+    <button id="generate-btn" type="button">⚡ Generate D1–D60 CSV</button>
+  </section>
+
+  <section class="status-section" aria-live="polite">
+    <div id="status-msg" class="status" role="status">
+      Ready. Internet connection required for first-time engine load.
+    </div>
+  </section>
+
+  <section class="progress-section">
+    <div class="progress-header">
+      <span class="progress-title">Progress</span>
+      <span id="progress-label">0%</span>
+    </div>
+    <div class="progress-track">
+      <div id="progress-bar"></div>
+    </div>
+    <div class="progress-meta">
+      <span id="progress-counter">0 / 0 rows</span>
+      <span id="current-ts">—</span>
+    </div>
+  </section>
+
+  <section class="schema-section">
+    <div class="schema-title">CSV Columns (36 total)</div>
+    <div class="schema-group">
+      <div class="schema-group-label">Time &amp; Location</div>
+      <div class="schema-tags">
+        <span class="schema-tag">ts_local</span><span class="schema-tag">ts_utc</span>
+        <span class="schema-tag">timezone</span><span class="schema-tag">latitude</span>
+        <span class="schema-tag">longitude</span><span class="schema-tag">weekday_en</span>
+        <span class="schema-tag">weekday_hi</span>
+      </div>
+    </div>
+    <div class="schema-group">
+      <div class="schema-group-label">Panchang (Hindi + English)</div>
+      <div class="schema-tags">
+        <span class="schema-tag">tithi_id</span><span class="schema-tag">tithi_en</span>
+        <span class="schema-tag">tithi_hi</span><span class="schema-tag">paksha_en</span>
+        <span class="schema-tag">paksha_hi</span><span class="schema-tag">nakshatra_id</span>
+        <span class="schema-tag">nakshatra_en</span><span class="schema-tag">nakshatra_hi</span>
+        <span class="schema-tag">yoga_id</span><span class="schema-tag">yoga_en</span>
+        <span class="schema-tag">yoga_hi</span><span class="schema-tag">karana_id</span>
+        <span class="schema-tag">karana_en</span><span class="schema-tag">karana_hi</span>
+      </div>
+    </div>
+    <div class="schema-group">
+      <div class="schema-group-label">Graha Longitudes (Sidereal Lahiri)</div>
+      <div class="schema-tags">
+        <span class="schema-tag">ayanamsa_deg</span><span class="schema-tag">sun_lon</span>
+        <span class="schema-tag">moon_lon</span><span class="schema-tag">mars_lon</span>
+        <span class="schema-tag">mercury_lon</span><span class="schema-tag">jupiter_lon</span>
+        <span class="schema-tag">venus_lon</span><span class="schema-tag">saturn_lon</span>
+        <span class="schema-tag">rahu_lon</span><span class="schema-tag">ketu_lon</span>
+      </div>
+    </div>
+    <div class="schema-group">
+      <div class="schema-group-label">Daily Flags</div>
+      <div class="schema-tags">
+        <span class="schema-tag">sunrise_local</span><span class="schema-tag">sunset_local</span>
+        <span class="schema-tag">is_rahu_kaal</span><span class="schema-tag">is_gulika_kaal</span>
+        <span class="schema-tag">is_yamaganda</span>
+      </div>
+    </div>
+  </section>
+
+  <footer class="app-footer">
+    <p class="footer-text">
+      Swiss Ephemeris WASM &nbsp;·&nbsp; Lahiri Ayanamsa &nbsp;·&nbsp; True Node &nbsp;·&nbsp; No data sent anywhere
+    </p>
+  </footer>
+
+</div>
+
+<script type="module">
+// ============================================================
+// MAIN APP — All-in-one module
+// Uses prolaxu/swisseph-wasm via CDN (internet required)
+// ============================================================
+
+// ── Config ──────────────────────────────────────────────────
+const LAT      = 40.7069;
+const LON      = -74.0113;
+const TZ       = 'America/New_York';
+const DAYS     = 60;
+const STEP     = 1; // minutes
+const FILENAME = 'NYSE_D1-D60_1min_panchang_vedic_hi-en.csv';
+const BATCH    = 300;
+
+// ── i18n Data ────────────────────────────────────────────────
+const EN = {
+  weekdays: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+  paksha:   { shukla:'Shukla', krishna:'Krishna' },
+  tithis:   ['','Pratipada','Dwitiya','Tritiya','Chaturthi','Panchami','Shashthi',
+    'Saptami','Ashtami','Navami','Dashami','Ekadashi','Dwadashi','Trayodashi',
+    'Chaturdashi','Purnima','Pratipada','Dwitiya','Tritiya','Chaturthi','Panchami',
+    'Shashthi','Saptami','Ashtami','Navami','Dashami','Ekadashi','Dwadashi',
+    'Trayodashi','Chaturdashi','Amavasya'],
+  nakshatras: ['','Ashwini','Bharani','Krittika','Rohini','Mrigashirsha','Ardra',
+    'Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni',
+    'Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Mula',
+    'Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha',
+    'Purva Bhadrapada','Uttara Bhadrapada','Revati'],
+  yogas: ['','Vishkambha','Priti','Ayushman','Saubhagya','Shobhana','Atiganda',
+    'Sukarma','Dhriti','Shula','Ganda','Vriddhi','Dhruva','Vyaghata','Harshana',
+    'Vajra','Siddhi','Vyatipata','Variyana','Parigha','Shiva','Siddha','Sadhya',
+    'Shubha','Shukla','Brahma','Indra','Vaidhriti'],
+  karanas: { Kimstughna:'Kimstughna',Bava:'Bava',Balava:'Balava',Kaulava:'Kaulava',
+    Taitila:'Taitila',Garaja:'Garaja',Vanija:'Vanija',Vishti:'Vishti',
+    Shakuni:'Shakuni',Chatushpada:'Chatushpada',Naga:'Naga' }
+};
+
+const HI = {
+  weekdays: ['रविवार','सोमवार','मंगलवार','बुधवार','गुरुवार','शुक्रवार','शनिवार'],
+  paksha:   { shukla:'शुक्ल', krishna:'कृष्ण' },
+  tithis:   ['','प्रतिपदा','द्वितीया','तृतीया','चतुर्थी','पंचमी','षष्ठी','सप्तमी',
+    'अष्टमी','नवमी','दशमी','एकादशी','द्वादशी','त्रयोदशी','चतुर्दशी','पूर्णिमा',
+    'प्रतिपदा','द्वितीया','तृतीया','चतुर्थी','पंचमी','षष्ठी','सप्तमी','अष्टमी',
+    'नवमी','दशमी','एकादशी','द्वादशी','त्रयोदशी','चतुर्दशी','अमावस्या'],
+  nakshatras: ['','अश्विनी','भरणी','कृत्तिका','रोहिणी','मृगशिरा','आर्द्रा','पुनर्वसु',
+    'पुष्य','आश्लेषा','मघा','पूर्व फाल्गुनी','उत्तर फाल्गुनी','हस्त','चित्रा',
+    'स्वाती','विशाखा','अनुराधा','ज्येष्ठा','मूल','पूर्व आषाढ़','उत्तर आषाढ़',
+    'श्रवण','धनिष्ठा','शतभिषा','पूर्व भाद्रपद','उत्तर भाद्रपद','रेवती'],
+  yogas: ['','विष्कम्भ','प्रीति','आयुष्मान','सौभाग्य','शोभन','अतिगण्ड','सुकर्मा',
+    'धृति','शूल','गण्ड','वृद्धि','ध्रुव','व्याघात','हर्षण','वज्र','सिद्धि',
+    'व्यतीपात','वरीयान','परिघ','शिव','सिद्ध','साध्य','शुभ','शुक्ल','ब्रह्म',
+    'इन्द्र','वैधृति'],
+  karanas: { Kimstughna:'किंस्तुघ्न',Bava:'बव',Balava:'बालव',Kaulava:'कौलव',
+    Taitila:'तैतिल',Garaja:'गरज',Vanija:'वणिज',Vishti:'विष्टि',
+    Shakuni:'शकुनि',Chatushpada:'चतुष्पाद',Naga:'नाग' }
+};
+
+// ── UI Helpers ───────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+function setStatus(msg, err=false) {
+  $('status-msg').textContent = msg;
+  $('status-msg').className = err ? 'status error' : 'status';
+}
+function setProgress(cur, tot) {
+  const pct = tot > 0 ? Math.round(cur/tot*100) : 0;
+  $('progress-bar').style.width = pct + '%';
+  $('progress-label').textContent = pct + '%';
+  $('progress-counter').textContent = `${cur.toLocaleString()} / ${tot.toLocaleString()} rows`;
+}
+function setCurrent(s) { $('current-ts').textContent = s; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── Time Engine ──────────────────────────────────────────────
+function getTodayNY() {
+  const p = new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'})
+    .formatToParts(new Date());
+  return `${p.find(x=>x.type==='year').value}-${p.find(x=>x.type==='month').value}-${p.find(x=>x.type==='day').value}`;
+}
+
+function addDays(dateStr, n) {
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m-1, d+n));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+}
+
+function localToUtc(dateStr, h, m) {
+  const [y,mo,d] = dateStr.split('-').map(Number);
+  const naive = new Date(Date.UTC(y, mo-1, d, h, m));
+  const parts = new Intl.DateTimeFormat('en-CA',{
+    timeZone:TZ, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12:false
+  }).formatToParts(naive);
+  const gp = t => Number(parts.find(p=>p.type===t).value);
+  const offsetMs = Date.UTC(gp('year'),gp('month')-1,gp('day'),gp('hour'),gp('minute')) - naive.getTime();
+  return new Date(naive.getTime() - offsetMs);
+}
+
+function formatLocal(utcDate) {
+  const p = new Intl.DateTimeFormat('en-CA',{
+    timeZone:TZ, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', hour12:false
+  }).formatToParts(utcDate);
+  const gp = t => p.find(x=>x.type===t).value;
+  const hh = gp('hour') === '24' ? '00' : gp('hour');
+  return `${gp('year')}-${gp('month')}-${gp('day')} ${hh}:${gp('minute')}`;
+}
+
+function getWeekday(utcDate) {
+  const abbr = new Intl.DateTimeFormat('en-US',{timeZone:TZ,weekday:'short'}).format(utcDate);
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(abbr);
+}
+
+function generateTimestamps(startDateStr) {
+  const ts = [];
+  for (let d=0; d<DAYS; d++) {
+    const dateStr = addDays(startDateStr, d);
+    for (let h=0; h<24; h++) {
+      for (let m=0; m<60; m+=STEP) {
+        const utcDate = localToUtc(dateStr, h, m);
+        const localStr = formatLocal(utcDate);
+        const expected = `${dateStr} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        if (localStr !== expected) continue; // DST gap
+        ts.push({ localStr, utcDate, epochSec: Math.floor(utcDate.getTime()/1000), dateStr, weekday: getWeekday(utcDate) });
+      }
+    }
+  }
+  return ts;
+}
+
+// ── Panchang Engine ──────────────────────────────────────────
+function norm(deg) { deg = deg % 360; return deg < 0 ? deg+360 : deg; }
+
+function computePanchang(sun, moon) {
+  const angle  = norm(moon - sun);
+  const tithi  = Math.min(Math.floor(angle/12)+1, 30);
+  const paksha = tithi <= 15 ? 'shukla' : 'krishna';
+  const nakId  = Math.min(Math.floor(norm(moon)/(360/27))+1, 27);
+  const yogId  = Math.min(Math.floor(norm(sun+moon)/(360/27))+1, 27);
+  const halfIdx = Math.floor(angle/6); // 0..59
+  let karKey;
+  if      (halfIdx === 0)                    karKey = 'Kimstughna';
+  else if (halfIdx >= 1 && halfIdx <= 56)    karKey = ['Bava','Balava','Kaulava','Taitila','Garaja','Vanija','Vishti'][(halfIdx-1)%7];
+  else if (halfIdx === 57)                   karKey = 'Shakuni';
+  else if (halfIdx === 58)                   karKey = 'Chatushpada';
+  else                                       karKey = 'Naga';
+  return { tithi, paksha, nakId, yogId, karId: halfIdx+1, karKey };
+}
+
+// Kaal flags
+const RAHU_SEG    = [8,2,7,5,6,3,4];
+const GULIKA_SEG  = [6,5,4,3,2,1,7];
+const YAMAG_SEG   = [4,3,2,1,7,6,5];
+
+function timeToHrs(s) {
+  if (!s || s==='N/A') return null;
+  const [h,m] = s.split(':').map(Number); return h + m/60;
+}
+function localStrToHrs(s) { return timeToHrs(s.substring(11)); }
+
+function computeKaal(localStr, sunrise, sunset, wd) {
+  const sr = timeToHrs(sunrise), ss = timeToHrs(sunset), cur = localStrToHrs(localStr);
+  if (sr===null||ss===null||cur<sr||cur>=ss) return [0,0,0];
+  const seg = (n) => { const sz=(ss-sr)/8; return { s:sr+(n-1)*sz, e:sr+n*sz }; };
+  const inW = (w) => cur>=w.s && cur<w.e;
+  return [inW(seg(RAHU_SEG[wd]))?1:0, inW(seg(GULIKA_SEG[wd]))?1:0, inW(seg(YAMAG_SEG[wd]))?1:0];
+}
+
+// ── CSV Engine ───────────────────────────────────────────────
+const BOM = '\uFEFF';
+const HDR = [
+  'ts_local','ts_utc','timezone','latitude','longitude','weekday_en','weekday_hi',
+  'tithi_id','tithi_en','tithi_hi','paksha_en','paksha_hi',
+  'nakshatra_id','nakshatra_en','nakshatra_hi',
+  'yoga_id','yoga_en','yoga_hi',
+  'karana_id','karana_en','karana_hi',
+  'ayanamsa_name','ayanamsa_deg',
+  'sun_lon','moon_lon','mars_lon','mercury_lon','jupiter_lon','venus_lon','saturn_lon','rahu_lon','ketu_lon',
+  'sunrise_local','sunset_local','is_rahu_kaal','is_gulika_kaal','is_yamaganda'
+].join(',');
+
+function esc(v) {
+  const s = (v===null||v===undefined) ? '' : String(v);
+  return (s.includes(',')||s.includes('"')||s.includes('\n')) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+
+function buildRow(r) {
+  return [
+    r.ts_local, r.ts_utc, r.timezone, r.lat, r.lon,
+    r.wd_en, r.wd_hi,
+    r.tithi, r.tithi_en, r.tithi_hi, r.paksha_en, r.paksha_hi,
+    r.nak, r.nak_en, r.nak_hi,
+    r.yog, r.yog_en, r.yog_hi,
+    r.kar, r.kar_en, r.kar_hi,
+    'Lahiri', r.ayan,
+    r.sun, r.moon, r.mars, r.merc, r.jupi, r.venu, r.satu, r.rahu, r.ketu,
+    r.sunrise, r.sunset, r.rk, r.gk, r.ym
+  ].map(esc).join(',');
+}
+
+function download(lines) {
+  const blob = new Blob([BOM + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = FILENAME; a.style.display='none';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 5000);
+}
+
+// ── JD → Local HH:mm ─────────────────────────────────────────
+function jdToLocalTime(jd) {
+  const d = new Date((jd - 2440587.5)*86400000);
+  const p = new Intl.DateTimeFormat('en-GB',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
+  return p.find(x=>x.type==='hour').value+':'+p.find(x=>x.type==='minute').value;
+}
+
+// ── Main ─────────────────────────────────────────────────────
+let running = false;
+const srCache = {};
+
+async function generate() {
+  if (running) return;
+  running = true;
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('generate-btn').textContent = 'Generating…';
+
+  try {
+    // Load SwissEph from CDN
+    setStatus('Loading Swiss Ephemeris engine from CDN…');
+    const { default: SwissEph } = await import('https://cdn.jsdelivr.net/gh/prolaxu/swisseph-wasm@main/src/swisseph.js');
+
+    const swe = new SwissEph();
+    await swe.initSwissEph();
+    swe.set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+    setStatus('Engine loaded ✓. Generating timestamps…');
+
+    const today = getTodayNY();
+    const timestamps = generateTimestamps(today);
+    const total = timestamps.length;
+    setStatus(`Processing ${total.toLocaleString()} rows…`);
+    setProgress(0, total);
+
+    const lines = [HDR];
+    let done = 0;
+
+    for (let i=0; i<total; i+=BATCH) {
+      const batch = timestamps.slice(i, i+BATCH);
+
+      for (const ts of batch) {
+        setCurrent(ts.localStr);
+        const jd = ts.epochSec/86400 + 2440587.5;
+        const flag = swe.SEFLG_SWIEPH | swe.SEFLG_SIDEREAL;
+        const TN   = swe.SE_TRUE_NODE !== undefined ? swe.SE_TRUE_NODE : 11;
+
+        const sun  = norm(swe.calc_ut(jd, swe.SE_SUN,     flag)[0]);
+        const moon = norm(swe.calc_ut(jd, swe.SE_MOON,    flag)[0]);
+        const mars = norm(swe.calc_ut(jd, swe.SE_MARS,    flag)[0]);
+        const merc = norm(swe.calc_ut(jd, swe.SE_MERCURY, flag)[0]);
+        const jupi = norm(swe.calc_ut(jd, swe.SE_JUPITER, flag)[0]);
+        const venu = norm(swe.calc_ut(jd, swe.SE_VENUS,   flag)[0]);
+        const satu = norm(swe.calc_ut(jd, swe.SE_SATURN,  flag)[0]);
+        const rahu = norm(swe.calc_ut(jd, TN,             flag)[0]);
+        const ketu = norm(rahu + 180);
+        const ayan = swe.get_ayanamsa_ut(jd);
+
+        const pc = computePanchang(sun, moon);
+
+        // Sunrise/sunset (cached per day)
+        if (!srCache[ts.dateStr]) {
+          const [y,m,d] = ts.dateStr.split('-').map(Number);
+          const jdNoon  = swe.julday(y, m, d, 12.0);
+          let sr='N/A', ss='N/A';
+          try {
+            const rr = swe.rise_trans(jdNoon-0.5, swe.SE_SUN,'',swe.SEFLG_SWIEPH,1,[LON,LAT,0],1013.25,15);
+            if (rr?.tret?.[0]) sr = jdToLocalTime(rr.tret[0]);
+          } catch(e){}
+          try {
+            const rs = swe.rise_trans(jdNoon-0.5, swe.SE_SUN,'',swe.SEFLG_SWIEPH,2,[LON,LAT,0],1013.25,15);
+            if (rs?.tret?.[0]) ss = jdToLocalTime(rs.tret[0]);
+          } catch(e){}
+          srCache[ts.dateStr] = { sr, ss };
+        }
+        const { sr: sunrise, ss: sunset } = srCache[ts.dateStr];
+        const [rk,gk,ym] = computeKaal(ts.localStr, sunrise, sunset, ts.weekday);
+
+        lines.push(buildRow({
+          ts_local: ts.localStr, ts_utc: ts.epochSec,
+          timezone: TZ, lat: LAT, lon: LON,
+          wd_en: EN.weekdays[ts.weekday], wd_hi: HI.weekdays[ts.weekday],
+          tithi: pc.tithi, tithi_en: EN.tithis[pc.tithi], tithi_hi: HI.tithis[pc.tithi],
+          paksha_en: EN.paksha[pc.paksha], paksha_hi: HI.paksha[pc.paksha],
+          nak: pc.nakId, nak_en: EN.nakshatras[pc.nakId], nak_hi: HI.nakshatras[pc.nakId],
+          yog: pc.yogId, yog_en: EN.yogas[pc.yogId], yog_hi: HI.yogas[pc.yogId],
+          kar: pc.karId, kar_en: EN.karanas[pc.karKey], kar_hi: HI.karanas[pc.karKey],
+          ayan: ayan.toFixed(6),
+          sun:  sun.toFixed(6),  moon: moon.toFixed(6), mars: mars.toFixed(6),
+          merc: merc.toFixed(6), jupi: jupi.toFixed(6), venu: venu.toFixed(6),
+          satu: satu.toFixed(6), rahu: rahu.toFixed(6), ketu: ketu.toFixed(6),
+          sunrise, sunset, rk, gk, ym
+        }));
+        done++;
+      }
+
+      setProgress(done, total);
+      await sleep(0);
+    }
+
+    swe.close();
+    setStatus(`✅ Done! ${done.toLocaleString()} rows. Downloading…`);
+    download(lines);
+    setProgress(total, total);
+    setStatus(`✅ ${done.toLocaleString()} rows downloaded → ${FILENAME}`);
+
+  } catch(e) {
+    console.error(e);
+    setStatus('❌ Error: ' + (e.message || String(e)), true);
+  } finally {
+    running = false;
+    document.getElementById('generate-btn').disabled = false;
+    document.getElementById('generate-btn').textContent = '⚡ Generate D1–D60 CSV';
+  }
+}
+
+document.getElementById('generate-btn').addEventListener('click', generate);
+</script>
+
+</body>
+</html>

@@ -1,8 +1,0 @@
-{
-  "rangeDays": 60,
-  "stepMinutes": 1,
-  "ayanamsa": "lahiri",
-  "nodeType": "true",
-  "includeGrahaLongitudes": true,
-  "includeKaalFlags": true
-}

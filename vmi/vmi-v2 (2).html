@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>VMI — Vedic Market Intelligence v2</title>
+<style>
+:root{
+  --bg:#07090f;--bg2:#0d1117;--bg3:#131c2b;--bg4:#1a2540;
+  --b1:#1e2d45;--b2:#2a3f5f;
+  --t1:#dce6f7;--t2:#8fa5c5;--t3:#4a607d;
+  --bull:#00e5a0;--bull2:rgba(0,229,160,.13);--bull3:rgba(0,229,160,.06);
+  --bear:#ff3355;--bear2:rgba(255,51,85,.13);--bear3:rgba(255,51,85,.06);
+  --neut:#f5a623;--neut2:rgba(245,166,35,.13);--neut3:rgba(245,166,35,.06);
+  --acc:#4f8ef7;--acc2:rgba(79,142,247,.13);
+  --gold:#ffd166;--purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;
+  --asian:#f472b6;--london:#60a5fa;--ny:#34d399;
+  --fs:'Segoe UI',system-ui,sans-serif;--fh:'Georgia',serif;--fm:'Courier New',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:var(--fs);font-size:14px;line-height:1.6}
+.W{max-width:1200px;margin:0 auto;padding:0 16px 80px}
+
+/* Header */
+.hdr{padding:22px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:18px;display:flex;align-items:center;gap:14px}
+.logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--acc),var(--bull));display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;box-shadow:0 0 18px rgba(79,142,247,.3)}
+.hdr h1{font-family:var(--fh);font-size:1.3rem;font-weight:700;letter-spacing:-.02em}
+.hdr p{font-size:.74rem;color:var(--t2);margin-top:2px}
+
+/* Upload */
+.up{border:2px dashed var(--b2);border-radius:14px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px;position:relative;background:var(--bg2)}
+.up:hover,.up.drag{border-color:var(--acc);background:var(--acc2)}
+.up input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.up-h{font-size:.92rem;font-weight:600;margin:8px 0 3px}
+.up-s{font-size:.76rem;color:var(--t2)}
+
+/* Status */
+#st{background:var(--bg3);border-radius:10px;padding:9px 13px;font-size:.8rem;color:var(--t2);margin-bottom:12px;min-height:36px;display:flex;align-items:center}
+#st.ok{color:var(--bull)}#st.err{color:var(--bear);border:1px solid var(--bear)}
+.pr{display:none;margin-bottom:14px}
+.prt{background:var(--bg3);border-radius:99px;height:4px;overflow:hidden}
+.prf{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--bull));border-radius:99px;transition:width .15s}
+.prl{font-size:.68rem;color:var(--t2);text-align:right;margin-top:3px}
+
+/* Summary */
+#sum{display:none;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px}
+.sc{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:12px 10px}
+.scn{font-size:1.4rem;font-weight:700;font-family:var(--fh)}
+.scn.bull{color:var(--bull)}.scn.bear{color:var(--bear)}.scn.neut{color:var(--neut)}.scn.acc{color:var(--acc)}.scn.gold{color:var(--gold)}
+.scl{font-size:.64rem;color:var(--t2);margin-top:1px}
+
+/* Day picker */
+#pk{display:none;margin-bottom:18px}
+.pkl{font-size:.66rem;color:var(--t2);font-weight:700;letter-spacing:.06em;margin-bottom:7px}
+.pkg{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.pki{border-radius:8px;padding:6px 3px;cursor:pointer;border:1px solid var(--b1);background:var(--bg2);text-align:center;transition:all .15s}
+.pki:hover{border-color:var(--acc)}.pki.sel{border-color:var(--acc);background:var(--acc2)}
+.pki.bull{border-color:rgba(0,229,160,.35)}.pki.bear{border-color:rgba(255,51,85,.35)}.pki.neut{border-color:rgba(245,166,35,.25)}.pki.wknd{opacity:.3}
+.pkid{font-size:.57rem;color:var(--t2)}.pkis{font-size:.8rem;font-weight:700;font-family:var(--fh)}
+.pki.bull .pkis{color:var(--bull)}.pki.bear .pkis{color:var(--bear)}.pki.neut .pkis{color:var(--neut)}
+
+/* Main */
+#main{display:none}
+.stabs{display:flex;border-bottom:2px solid var(--b1)}
+.stab{padding:9px 18px;font-size:.78rem;font-weight:700;cursor:pointer;border:none;background:none;color:var(--t2);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;letter-spacing:.03em}
+.stab.asian.on{color:var(--asian);border-bottom-color:var(--asian)}
+.stab.london.on{color:var(--london);border-bottom-color:var(--london)}
+.stab.ny.on{color:var(--ny);border-bottom-color:var(--ny)}
+.stab.comb.on{color:var(--acc);border-bottom-color:var(--acc)}
+.sv{display:none;padding:18px 0}.sv.on{display:block}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:16px;margin-bottom:12px}
+.card-title{font-size:.66rem;font-weight:700;letter-spacing:.07em;color:var(--t2);margin-bottom:12px}
+
+/* Session hero */
+.hero{border-radius:14px;padding:18px 20px;margin-bottom:12px}
+.hero.asian{background:linear-gradient(135deg,rgba(244,114,182,.08),rgba(244,114,182,.02));border:1px solid rgba(244,114,182,.2)}
+.hero.london{background:linear-gradient(135deg,rgba(96,165,250,.08),rgba(96,165,250,.02));border:1px solid rgba(96,165,250,.2)}
+.hero.ny{background:linear-gradient(135deg,rgba(52,211,153,.08),rgba(52,211,153,.02));border:1px solid rgba(52,211,153,.2)}
+.hero-grid{display:grid;grid-template-columns:2fr 1fr 1fr 100px;gap:14px;align-items:start}
+.hl{font-size:.63rem;font-weight:700;letter-spacing:.08em;margin-bottom:3px}
+.asian .hl{color:var(--asian)}.london .hl{color:var(--london)}.ny .hl{color:var(--ny)}
+.hv{font-size:.85rem;color:var(--t1);margin-bottom:3px}
+.hv b{color:var(--gold)}
+.big-score{font-size:2.4rem;font-weight:700;font-family:var(--fh);line-height:1;text-align:right}
+.big-sig{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-align:right;margin-top:3px}
+
+/* 3 signal cards */
+.sig3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.sig-c{border-radius:10px;padding:13px;border:1px solid var(--b1)}
+.sig-c.bull{background:var(--bull3);border-color:rgba(0,229,160,.2)}
+.sig-c.bear{background:var(--bear3);border-color:rgba(255,51,85,.2)}
+.sig-c.neut{background:var(--bg3);border-color:var(--b1)}
+.sig-lbl{font-size:.62rem;font-weight:700;letter-spacing:.07em;color:var(--t2);margin-bottom:6px}
+.sig-main{font-size:1.05rem;font-weight:700;margin-bottom:3px}
+.sig-sub{font-size:.72rem;color:var(--t2)}
+.sig-sub b{color:var(--t1)}
+
+/* Score breakdown */
+.bk-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.bk-lbl{font-size:.72rem;color:var(--t2);width:150px;flex-shrink:0}
+.bk-bar-bg{flex:1;background:var(--bg3);border-radius:99px;height:7px;overflow:hidden;position:relative}
+.bk-bar-fill{height:100%;border-radius:99px}
+.bk-val{font-size:.72rem;font-family:var(--fm);width:52px;text-align:right;flex-shrink:0}
+.bk-val.pos{color:var(--bull)}.bk-val.neg{color:var(--bear)}.bk-val.z{color:var(--neut)}
+.bk-w{font-size:.6rem;color:var(--t3);width:28px;text-align:right;flex-shrink:0}
+
+/* SVG Chart */
+.chart-box{width:100%;overflow:hidden;margin-top:4px}
+svg.mc{width:100%;display:block;overflow:visible}
+
+/* Moon speed */
+.moon3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.m3c{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:13px;text-align:center}
+.m3v{font-size:1.15rem;font-weight:700;font-family:var(--fh);margin-bottom:3px}
+.m3l{font-size:.64rem;color:var(--t2)}
+
+/* Planet grid */
+.pg9{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.pc{background:var(--bg3);border-radius:10px;padding:12px;border:1px solid var(--b1);border-top:2px solid transparent}
+.pc.sun{border-top-color:#fbbf24}.pc.moon{border-top-color:#93c5fd}.pc.mars{border-top-color:#f87171}
+.pc.mercury{border-top-color:#6ee7b7}.pc.jupiter{border-top-color:#fde68a}.pc.venus{border-top-color:#f9a8d4}
+.pc.saturn{border-top-color:#94a3b8}.pc.rahu{border-top-color:#a78bfa}.pc.ketu{border-top-color:#fb923c}
+.pcn{font-size:.63rem;color:var(--t2);margin-bottom:2px}
+.pcl{font-family:var(--fm);font-size:.88rem;color:var(--gold);margin-bottom:2px}
+.pcr{font-size:.68rem;color:var(--t2);margin-bottom:4px}
+.pcs{font-size:.62rem;font-weight:700;padding:1px 7px;border-radius:99px;display:inline-block;margin-bottom:3px}
+.pcs.exalt{background:var(--bull2);color:var(--bull)}.pcs.debi{background:var(--bear2);color:var(--bear)}.pcs.own{background:var(--neut2);color:var(--neut)}
+.pcsig{font-size:.68rem}
+.pcsig.pos{color:var(--bull)}.pcsig.neg{color:var(--bear)}.pcsig.neut2{color:var(--t3)}
+/* Planet market impact */
+.pc-impact{font-size:.64rem;margin-top:4px;padding-top:4px;border-top:1px solid var(--b1);color:var(--t2)}
+.pc-impact b{color:var(--t1)}
+
+/* Aspect table */
+.asp-row{display:grid;grid-template-columns:160px 60px 90px 1fr 80px;gap:6px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.73rem;align-items:center}
+.asp-row:last-child{border-bottom:none}
+.asp-head{font-size:.63rem;font-weight:700;letter-spacing:.06em;color:var(--t2)}
+
+/* Events */
+.ev-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.ev-c{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:11px}
+.ev-c.karana{border-left:3px solid var(--purple)}.ev-c.nakshatra{border-left:3px solid var(--cyan)}
+.ev-c.tithi{border-left:3px solid var(--gold)}.ev-c.rahu{border-left:3px solid var(--bear);background:var(--bear3)}
+.ev-c.good{border-left:3px solid var(--bull);background:var(--bull3)}
+.ev-t{font-family:var(--fm);font-size:.73rem;color:var(--gold);margin-bottom:2px}
+.ev-h{font-size:.78rem;font-weight:600;margin-bottom:2px}
+.ev-b{font-size:.7rem;color:var(--t2)}
+.ev-imp{font-size:.6rem;font-weight:700;padding:1px 7px;border-radius:99px;margin-top:4px;display:inline-block}
+.ev-imp.high{background:var(--bear2);color:var(--bear)}.ev-imp.med{background:var(--neut2);color:var(--neut)}.ev-imp.good{background:var(--bull2);color:var(--bull)}.ev-imp.avoid{background:var(--bear2);color:var(--bear)}
+
+/* Trading windows */
+.win-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:9px;margin-bottom:6px;border:1px solid var(--b1)}
+.win-row.BUY{background:var(--bull3);border-color:rgba(0,229,160,.2)}
+.win-row.SELL{background:var(--bear3);border-color:rgba(255,51,85,.2)}
+.win-row.AVOID{background:var(--bear3);border-color:rgba(255,51,85,.15);opacity:.75}
+.win-row.WATCH{background:var(--neut3);border-color:rgba(245,166,35,.2)}
+.win-badge{font-size:.63rem;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0;min-width:48px;text-align:center}
+.win-badge.BUY{background:var(--bull2);color:var(--bull)}.win-badge.SELL{background:var(--bear2);color:var(--bear)}
+.win-badge.AVOID{background:var(--bear2);color:var(--bear)}.win-badge.WATCH{background:var(--neut2);color:var(--neut)}
+.win-body{flex:1}
+.win-time{font-family:var(--fm);font-size:.73rem;color:var(--t1);margin-bottom:2px}
+.win-score{font-size:.7rem;font-weight:700}
+.win-score.pos{color:var(--bull)}.win-score.neg{color:var(--bear)}
+.win-reason{font-size:.7rem;color:var(--t2);margin-top:2px}
+.win-factors{font-size:.65rem;color:var(--t3);margin-top:2px}
+
+/* Timeline */
+.tl-card{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.tl-hd{display:grid;grid-template-columns:65px 75px 65px 80px 1fr 65px;gap:5px;padding:9px 13px;border-bottom:1px solid var(--b1);font-size:.62rem;font-weight:700;letter-spacing:.05em;color:var(--t2)}
+.tl-r{display:grid;grid-template-columns:65px 75px 65px 80px 1fr 65px;gap:5px;padding:6px 13px;border-bottom:1px solid rgba(255,255,255,.03);align-items:center;transition:background .1s;font-size:.72rem}
+.tl-r:hover{background:var(--bg3)}
+.tl-r.r-karana{border-left:2px solid var(--purple)}
+.tl-r.r-nak{border-left:2px solid var(--cyan)}
+.tl-r.r-tithi{border-left:2px solid var(--gold)}
+.tl-r.r-rahu{border-left:2px solid var(--bear);background:var(--bear3)}
+.tl-r.r-best{border-left:2px solid var(--bull);background:var(--bull3)}
+.tl-time{font-family:var(--fm);color:var(--t2)}
+.tl-hora{font-size:.7rem;font-weight:600}
+.hs{color:#fbbf24}.hmo{color:#93c5fd}.hma{color:#f87171}.hme{color:#6ee7b7}.hj{color:#fde68a}.hv2{color:#f9a8d4}.hsa{color:#94a3b8}
+.tl-sig{font-weight:700;font-size:.7rem}
+.tl-sig.bull{color:var(--bull)}.tl-sig.bear{color:var(--bear)}.tl-sig.neut{color:var(--neut)}
+.tl-pc{color:var(--t2);font-size:.7rem}
+.tl-moon{font-family:var(--fm);font-size:.66rem;color:var(--purple)}
+.tl-score{font-family:var(--fm);text-align:right;font-size:.7rem}
+.tl-score.pos{color:var(--bull)}.tl-score.neg{color:var(--bear)}.tl-score.z{color:var(--neut)}
+
+/* Combined */
+.cc{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;margin-bottom:7px;overflow:hidden}
+.cc-hdr{display:grid;grid-template-columns:1fr 90px 90px 90px 75px;gap:8px;padding:12px 15px;cursor:pointer;align-items:center}
+.cc-hdr:hover{background:var(--bg3)}
+.cc-date{font-weight:600;font-size:.86rem}
+.cc-wd{font-size:.68rem;color:var(--t2);margin-top:1px}
+.cc-s{text-align:center}
+.cc-sl{font-size:.58rem;font-weight:700;letter-spacing:.05em;margin-bottom:1px}
+.cc-sl.asian{color:var(--asian)}.cc-sl.london{color:var(--london)}.cc-sl.ny{color:var(--ny)}
+.cc-sv{font-family:var(--fh);font-size:.88rem;font-weight:700}
+.cc-tot{font-family:var(--fh);font-size:1.1rem;font-weight:700;text-align:right}
+.cc-body{display:none;padding:12px 15px;border-top:1px solid var(--b1)}
+.cc-body.open{display:block}
+.cc-g{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cc-blk{background:var(--bg3);border-radius:9px;padding:11px}
+.cc-bh{font-size:.61rem;font-weight:700;letter-spacing:.06em;margin-bottom:7px}
+.cc-bh.asian{color:var(--asian)}.cc-bh.london{color:var(--london)}.cc-bh.ny{color:var(--ny)}
+.cc-stat{font-size:.71rem;color:var(--t2);margin-bottom:2px}
+.cc-stat b{color:var(--t1)}
+.cc-ev-row{font-size:.66rem;color:var(--t2);padding:2px 0;border-bottom:1px solid var(--b1)}
+.cc-ev-row:last-child{border:none}
+
+/* Disclaimer */
+.disc{font-size:.66rem;color:var(--t3);padding:10px 0;border-top:1px solid var(--b1);margin-top:6px;line-height:1.5}
+
+@media(max-width:768px){
+  #sum{grid-template-columns:repeat(3,1fr)}
+  .pkg{grid-template-columns:repeat(7,1fr)}
+  .hero-grid{grid-template-columns:1fr 1fr}
+  .sig3{grid-template-columns:1fr}
+  .pg9{grid-template-columns:repeat(2,1fr)}
+  .tl-hd,.tl-r{grid-template-columns:60px 70px 60px 1fr 60px}
+  .tl-hd>*:nth-child(4),.tl-r>*:nth-child(4){display:none}
+  .ev-grid,.cc-g{grid-template-columns:1fr}
+  .cc-hdr{grid-template-columns:1fr 70px 70px 70px 60px}
+  .moon3{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="W">
+
+<div class="hdr">
+  <div class="logo">🌏</div>
+  <div>
+    <h1>Vedic Market Intelligence v2</h1>
+    <p>Asian · London · New York · 10-Layer Deep Analysis · 9-Planet Individual Scoring · Moon Speed · Planetary Aspects · Lahiri</p>
+  </div>
+</div>
+
+<div class="up" id="dz">
+  <input type="file" id="fi" accept=".csv"/>
+  <div style="font-size:1.7rem">📂</div>
+  <div class="up-h">Load Panchang CSV (32MB supported)</div>
+  <div class="up-s">Fully local · No upload · 86,000+ rows processed in browser</div>
+</div>
+
+<div id="st">Waiting for CSV…</div>
+<div class="pr" id="pr"><div class="prt"><div class="prf" id="prf"></div></div><div class="prl" id="prl">0%</div></div>
+
+<div id="sum">
+  <div class="sc"><div class="scn bull" id="s1">0</div><div class="scl">Bullish Days</div></div>
+  <div class="sc"><div class="scn bear" id="s2">0</div><div class="scl">Bearish Days</div></div>
+  <div class="sc"><div class="scn neut" id="s3">0</div><div class="scl">Neutral Days</div></div>
+  <div class="sc"><div class="scn acc" id="s4">0</div><div class="scl">Trading Days</div></div>
+  <div class="sc"><div class="scn gold" id="s5">0</div><div class="scl">Rows Analyzed</div></div>
+</div>
+
+<div id="pk"><div class="pkl">SELECT DAY — CLICK ANY DATE BELOW</div><div class="pkg" id="pkg"></div></div>
+
+<div id="main">
+  <div class="stabs">
+    <button class="stab asian" data-s="asian">🌏 Asian 19:00–02:00</button>
+    <button class="stab london" data-s="london">🏦 London 03:00–09:30</button>
+    <button class="stab ny" data-s="ny">🗽 New York 09:30–16:00</button>
+    <button class="stab comb" data-s="comb">⚡ All Sessions</button>
+  </div>
+  <div class="sv" id="sv-asian"></div>
+  <div class="sv" id="sv-london"></div>
+  <div class="sv" id="sv-ny"></div>
+  <div class="sv" id="sv-comb"></div>
+</div>
+
+</div>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════
+// LOOKUP TABLES
+// ════════════════════════════════════════════════════════════
+const RASHI=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const RASHI_HI=['मेष','वृष','मिथुन','कर्क','सिंह','कन्या','तुला','वृश्चिक','धनु','मकर','कुंभ','मीन'];
+const WD=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const HORA=['Sun','Venus','Mercury','Moon','Saturn','Jupiter','Mars'];
+const HORA_SCORE={Sun:1.5,Venus:1,Mercury:0,Moon:0.3,Saturn:-1.5,Jupiter:2,Mars:-0.5};
+const HORA_CLS={Sun:'hs',Venus:'hv2',Mercury:'hme',Moon:'hmo',Saturn:'hsa',Jupiter:'hj',Mars:'hma'};
+const HORA_DESC={Sun:'Authority · Confidence',Venus:'Wealth · Gains',Mercury:'Choppy · Fast',Moon:'Volatile · Swings',Saturn:'Resistance · Bearish',Jupiter:'Growth · Strong Bullish',Mars:'Aggressive · Sharp'};
+const WD_HS={0:0,1:2,2:6,3:1,4:5,5:4,6:3};
+
+// Planet data: exalt rashi idx, debi rashi idx, own rashi idxs
+const PD={
+  sun:    {n:'Sun ☉',    c:'sun',    ex:0,  db:6,  own:[4],     mkt:'Market sentiment · Confidence',
+           bull_r:[0,3,4,8,11], bear_r:[6,9,10]},
+  moon:   {n:'Moon ☽',  c:'moon',   ex:1,  db:7,  own:[3],     mkt:'Intraday volatility · Emotions',
+           bull_r:[1,3,11],    bear_r:[7,9,10]},
+  mars:   {n:'Mars ♂',  c:'mars',   ex:9,  db:3,  own:[0,7],   mkt:'Aggression · Sharp moves · Volume',
+           bull_r:[0,9],       bear_r:[3,6]},
+  mercury:{n:'Mercury ☿',c:'mercury',ex:5, db:11, own:[5,6],   mkt:'Speed of trend · Direction clarity',
+           bull_r:[5,6],       bear_r:[11,8]},
+  jupiter:{n:'Jupiter ♃',c:'jupiter',ex:3, db:9,  own:[8,11],  mkt:'Overall bias · Bull/Bear trend',
+           bull_r:[3,8,11],    bear_r:[9,6]},
+  venus:  {n:'Venus ♀', c:'venus',  ex:11, db:5,  own:[1,6],   mkt:'Wealth flow · Comfort buying',
+           bull_r:[1,6,11],    bear_r:[5,0]},
+  saturn: {n:'Saturn ♄',c:'saturn', ex:6,  db:0,  own:[9,10],  mkt:'Resistance · Slow grind · Drag',
+           bull_r:[6,9,10],    bear_r:[0,3,4]},
+  rahu:   {n:'Rahu ☊',  c:'rahu',   ex:1,  db:7,  own:[],      mkt:'Sudden moves · Illusion · Trap',
+           bull_r:[],          bear_r:[7,10]},
+  ketu:   {n:'Ketu ☋',  c:'ketu',   ex:7,  db:1,  own:[],      mkt:'Uncertainty · Sudden reversal',
+           bull_r:[],          bear_r:[1,5]}
+};
+
+const BULL_T=[1,2,3,5,7,10,11,13,15];
+const BEAR_T=[4,6,8,9,12,14,30];
+const BULL_N={4:'Rohini · Stable',8:'Pushya · Best for wealth',10:'Magha · Authority',13:'Hasta · Gains',22:'Shravana · Progress',27:'Revati · Completion'};
+const BEAR_N={9:'Ashlesha · Avoid',17:'Anuradha · Obstacles',18:'Jyeshtha · Conflict',19:'Mula · Destruction'};
+const VOLT_N={6:'Ardra · High volatility',15:'Swati · Unstable',16:'Vishakha · Sharp'};
+const BULL_Y={2:'Priti',3:'Ayushman',4:'Saubhagya',5:'Shobhana',8:'Dhriti',14:'Harshana',16:'Siddhi',21:'Siddha',22:'Sadhya',23:'Shubha'};
+const BEAR_Y={1:'Vishkambha',6:'Atiganda',9:'Shula',10:'Ganda',13:'Vyaghata',17:'Vyatipata',19:'Parigha',27:'Vaidhriti'};
+const BULL_K=['Bava','Balava','Kaulava','Taitila','Garaja'];
+const BEAR_K=['Vishti','Shakuni','Naga','Chatushpada','Kimstughna'];
+
+// ════════════════════════════════════════════════════════════
+// SCORING ENGINE — 10 LAYERS
+// ════════════════════════════════════════════════════════════
+
+// Each layer returns {score (weighted), raw, label, detail, bullFactors, bearFactors}
+
+function L1_tithi(tithi, paksha){
+  const p=paksha==='Shukla'?1.5:-1.5;
+  const t=BULL_T.includes(tithi)?2:BEAR_T.includes(tithi)?-2:0;
+  const raw=p+t;
+  const factors=[];
+  if(p>0)factors.push({f:`Shukla Paksha`,s:p,bull:true});
+  else factors.push({f:`Krishna Paksha`,s:p,bull:false});
+  if(t>0)factors.push({f:`Tithi ${tithi} (auspicious)`,s:t,bull:true});
+  if(t<0)factors.push({f:`Tithi ${tithi} (inauspicious)`,s:t,bull:false});
+  return{score:raw*0.18,raw,label:'Tithi + Paksha',detail:`${tithi} ${paksha}`,w:18,factors};
+}
+
+function L2_nakshatra(nak, nakName){
+  let raw=0, detail='Neutral nakshatra', factors=[];
+  if(BULL_N[nak]){raw=2.5;detail=BULL_N[nak];factors.push({f:nakName+' (bullish)',s:2.5,bull:true})}
+  else if(BEAR_N[nak]){raw=-2.5;detail=BEAR_N[nak];factors.push({f:nakName+' (bearish)',s:-2.5,bull:false})}
+  else if(VOLT_N[nak]){raw=0;detail=VOLT_N[nak];factors.push({f:nakName+' (volatile)',s:0,bull:null})}
+  else{raw=0.3;factors.push({f:nakName+' (neutral)',s:0.3,bull:null})}
+  return{score:raw*0.18,raw,label:'Nakshatra',detail,w:18,factors};
+}
+
+function L3_yoga(yoga, yogaName){
+  let raw=0, detail='Neutral', factors=[];
+  if(BULL_Y[yoga]){raw=2;detail=BULL_Y[yoga]+' (auspicious)';factors.push({f:yogaName,s:2,bull:true})}
+  else if(BEAR_Y[yoga]){raw=-2.5;detail=BEAR_Y[yoga]+' (inauspicious)';factors.push({f:yogaName+' (avoid)',s:-2.5,bull:false})}
+  return{score:raw*0.13,raw,label:'Yoga',detail,w:13,factors};
+}
+
+function L4_karana(k){
+  let raw=0, detail='Neutral', factors=[];
+  if(BULL_K.some(x=>k.includes(x))){raw=1.5;detail=k+' (auspicious)';factors.push({f:k,s:1.5,bull:true})}
+  else if(BEAR_K.some(x=>k.includes(x))){raw=-2.5;detail=k+' (inauspicious)';factors.push({f:k+' (avoid)',s:-2.5,bull:false})}
+  return{score:raw*0.09,raw,label:'Karana',detail,w:9,factors};
+}
+
+function L5_grahaStrength(row){
+  const keys={sun:'sun_lon',moon:'moon_lon',mars:'mars_lon',mercury:'mercury_lon',
+    jupiter:'jupiter_lon',venus:'venus_lon',saturn:'saturn_lon',rahu:'rahu_lon',ketu:'ketu_lon'};
+  let total=0; const factors=[], details=[];
+  for(const[pn,col] of Object.entries(keys)){
+    const lon=+(row[col]||0);
+    const ri=Math.floor(lon/30)%12;
+    const pd=PD[pn]; if(!pd)continue;
+    let ps=0, status='';
+    if(ri===pd.ex){ps=2.5;status='EXALTED'}
+    else if(ri===pd.db){ps=-2.5;status='DEBILITATED'}
+    else if(pd.own.includes(ri)){ps=1.5;status='OWN SIGN'}
+    else if(pd.bull_r.includes(ri)){ps=0.8;status='Friendly'}
+    else if(pd.bear_r.includes(ri)){ps=-0.8;status='Enemy sign'}
+    if(Math.abs(ps)>=0.8){
+      factors.push({f:`${pd.n} ${status} in ${RASHI[ri]}`,s:ps,bull:ps>0});
+      if(Math.abs(ps)>=1.5)details.push(`${pd.n} ${status}`);
+    }
+    total+=ps;
+  }
+  const raw=total/9;
+  return{score:raw*0.15,raw,label:'Graha Strength',detail:details.slice(0,3).join(' · ')||'No special dignity',w:15,factors};
+}
+
+function L6_aspects(row){
+  const lons={
+    sun:+(row.sun_lon||0),moon:+(row.moon_lon||0),mars:+(row.mars_lon||0),
+    mercury:+(row.mercury_lon||0),jupiter:+(row.jupiter_lon||0),
+    venus:+(row.venus_lon||0),saturn:+(row.saturn_lon||0),rahu:+(row.rahu_lon||0),ketu:+(row.ketu_lon||0)
+  };
+  // Key pairs with their bull/bear impact
+  const pairs=[
+    {p1:'jupiter',p2:'moon',  bull:2,   bear:0,   name:'Jupiter-Moon'},
+    {p1:'jupiter',p2:'sun',   bull:1.5, bear:0,   name:'Jupiter-Sun'},
+    {p1:'jupiter',p2:'mars',  bull:1,   bear:0,   name:'Jupiter-Mars'},
+    {p1:'venus',  p2:'moon',  bull:1,   bear:0,   name:'Venus-Moon'},
+    {p1:'venus',  p2:'sun',   bull:0.8, bear:0,   name:'Venus-Sun'},
+    {p1:'saturn', p2:'sun',   bull:0,   bear:-2,  name:'Saturn-Sun'},
+    {p1:'saturn', p2:'moon',  bull:0,   bear:-2,  name:'Saturn-Moon'},
+    {p1:'saturn', p2:'mars',  bull:0,   bear:-1.5,name:'Saturn-Mars'},
+    {p1:'mars',   p2:'moon',  bull:0,   bear:-1.5,name:'Mars-Moon'},
+    {p1:'rahu',   p2:'moon',  bull:0,   bear:-2,  name:'Rahu-Moon'},
+    {p1:'ketu',   p2:'moon',  bull:0,   bear:-1,  name:'Ketu-Moon'},
+    {p1:'rahu',   p2:'sun',   bull:0,   bear:-1.5,name:'Rahu-Sun'},
+    {p1:'sun',    p2:'moon',  bull:0.5, bear:0,   name:'Sun-Moon'},
+    {p1:'mercury',p2:'moon',  bull:0.5, bear:0,   name:'Mercury-Moon'},
+  ];
+  let total=0; const factors=[], aspDetails=[];
+  for(const pair of pairs){
+    const l1=lons[pair.p1], l2=lons[pair.p2];
+    if(l1===undefined||l2===undefined)continue;
+    const diff=((l2-l1)%360+360)%360;
+    const md=Math.min(diff,360-diff);
+    let aspName='', aspMult=0, aspType='';
+    if(md<10){aspName='Conjunction';aspMult=1;aspType='conj'}
+    else if(Math.abs(md-60)<8){aspName='Sextile';aspMult=0.6;aspType='sext'}
+    else if(Math.abs(md-90)<8){aspName='Square';aspMult=0.8;aspType='sq'}
+    else if(Math.abs(md-120)<8){aspName='Trine';aspMult=0.8;aspType='trine'}
+    else if(Math.abs(md-180)<10){aspName='Opposition';aspMult=0.9;aspType='opp'}
+    if(!aspName)continue;
+    // Bull aspects (trine/sextile) boost bull pairs, sq/opp boost bear pairs
+    let impact=0;
+    if(aspType==='trine'||aspType==='sext'){
+      impact=pair.bull*aspMult;
+      if(impact>0.3)factors.push({f:`${pair.name} ${aspName} (${md.toFixed(1)}°)`,s:impact,bull:true,asp:aspName});
+    } else if(aspType==='conj'){
+      impact=(pair.bull+pair.bear)*aspMult;
+      if(Math.abs(impact)>0.3)factors.push({f:`${pair.name} ${aspName} (${md.toFixed(1)}°)`,s:impact,bull:impact>0,asp:aspName});
+    } else {
+      impact=pair.bear*aspMult;
+      if(impact<-0.3)factors.push({f:`${pair.name} ${aspName} (${md.toFixed(1)}°)`,s:impact,bull:false,asp:aspName});
+    }
+    total+=impact;
+    if(Math.abs(impact)>0.5)aspDetails.push(`${pair.name} ${aspName}`);
+  }
+  const raw=Math.max(-5,Math.min(5,total));
+  return{score:raw*0.12,raw,label:'Graha Aspects',detail:aspDetails.slice(0,2).join(' · ')||'No major aspects',w:12,factors,aspDetails:factors};
+}
+
+function L7_moonSpeed(spd){
+  // spd = degrees per minute (from consecutive rows)
+  // Normal range: 0.007–0.015 deg/min (sidereal per minute)
+  // Actual data shows ~0.009324 deg/min = 0.5594 deg/hr
+  if(spd===null)return{score:0,raw:0,label:'Moon Speed',detail:'N/A',w:7,factors:[]};
+  // Per minute speed thresholds
+  const fast=0.012, slow=0.007;
+  let raw=0, detail='', factors=[];
+  if(spd>fast){raw=-0.8;detail=`Fast (${spd.toFixed(5)}°/min) · Volatile · Both sides`;factors.push({f:`Fast moon · volatility`,s:-0.8,bull:false})}
+  else if(spd<slow){raw=0.8;detail=`Slow (${spd.toFixed(5)}°/min) · Stable trend`;factors.push({f:`Slow moon · stability`,s:0.8,bull:true})}
+  else{raw=0.3;detail=`Normal (${spd.toFixed(5)}°/min) · Steady`;factors.push({f:`Normal moon speed`,s:0.3,bull:null})}
+  return{score:raw*0.07,raw,label:'Moon Speed',detail,w:7,spd,factors};
+}
+
+function L8_kaal(row){
+  let raw=0; const factors=[];
+  if(row.is_rahu_kaal==='1'||row.is_rahu_kaal===1){raw-=3;factors.push({f:'Rahu Kaal · Avoid trading',s:-3,bull:false})}
+  if(row.is_gulika_kaal==='1'||row.is_gulika_kaal===1){raw-=1.5;factors.push({f:'Gulika Kaal · Caution',s:-1.5,bull:false})}
+  if(row.is_yamaganda==='1'||row.is_yamaganda===1){raw-=2;factors.push({f:'Yamaganda · High risk',s:-2,bull:false})}
+  if(raw===0)factors.push({f:'All kaal clear',s:0,bull:null});
+  return{score:raw*0.10,raw,label:'Kaal Flags',detail:raw<0?factors.map(f=>f.f).join(' · '):'Clear · Safe to trade',w:10,factors};
+}
+
+function L9_hora(hora){
+  const raw=HORA_SCORE[hora]||0;
+  const bull=raw>0;
+  return{score:raw*0.05,raw,label:'Hora',detail:`${hora} Hora · ${HORA_DESC[hora]}`,w:5,
+    factors:[{f:`${hora} Hora · ${HORA_DESC[hora]}`,s:raw,bull}]};
+}
+
+function L10_sunPosition(sunLon, moonLon){
+  const sri=Math.floor(sunLon/30)%12;
+  const mri=Math.floor(moonLon/30)%12;
+  // Sun position market sentiment
+  const sunBull=[0,3,4,8,11];
+  const sunBear=[6,9,10];
+  // Moon rashi effect on markets
+  const moonBull=[1,3,4,11];
+  const moonBear=[7,9,10];
+  let raw=0; const factors=[];
+  if(sunBull.includes(sri)){raw+=1;factors.push({f:`Sun in ${RASHI[sri]} (bullish sign)`,s:1,bull:true})}
+  else if(sunBear.includes(sri)){raw-=0.8;factors.push({f:`Sun in ${RASHI[sri]} (bearish sign)`,s:-0.8,bull:false})}
+  if(moonBull.includes(mri)){raw+=0.8;factors.push({f:`Moon in ${RASHI[mri]} (bullish)`,s:0.8,bull:true})}
+  else if(moonBear.includes(mri)){raw-=0.8;factors.push({f:`Moon in ${RASHI[mri]} (bearish)`,s:-0.8,bull:false})}
+  return{score:raw*0.08,raw,label:'Sun+Moon Rashi',detail:`Sun ${RASHI[sri]} · Moon ${RASHI[mri]}`,w:8,factors};
+}
+
+// Master score function
+function scoreRow(row, hora, moonSpd){
+  const t=+row.tithi_id||1, p=row.paksha_en||'', n=+row.nakshatra_id||1;
+  const y=+row.yoga_id||1, k=row.karana_en||'';
+  const layers=[
+    L1_tithi(t,p),
+    L2_nakshatra(n, row.nakshatra_en||''),
+    L3_yoga(y, row.yoga_en||''),
+    L4_karana(k),
+    L5_grahaStrength(row),
+    L6_aspects(row),
+    L7_moonSpeed(moonSpd),
+    L8_kaal(row),
+    L9_hora(hora),
+    L10_sunPosition(+(row.sun_lon||0),+(row.moon_lon||0))
+  ];
+  const total=layers.reduce((a,l)=>a+l.score,0);
+  return{total:Math.max(-10,Math.min(10,total)), layers};
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════
+const getRashi=lon=>Math.floor(((+lon)%360)/30);
+const wdN=n=>WD.indexOf(n);
+const tH=s=>(!s||s==='N/A')?6.5:(([h,m]=s.split(':').map(Number)),h+m/60);
+const gHora=(hf,wd,sr)=>HORA[((WD_HS[wd]||0)+Math.max(0,Math.floor(hf-sr)))%7];
+const ss=s=>(s>=0?'+':'')+s.toFixed(2);
+const scol=s=>s>=2.5?'var(--bull)':s<=-2.5?'var(--bear)':'var(--neut)';
+const scls=s=>s>=2.5?'bull':s<=-2.5?'bear':'neut';
+const ssig=s=>s>=2.5?'↑ BULLISH':s<=-2.5?'↓ BEARISH':'↔ NEUTRAL';
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const approxSR=ds=>{const m=+ds.substring(5,7);return({1:'07:10',2:'06:40',3:'06:55',4:'06:10',5:'05:48',6:'05:28',7:'05:33',8:'06:02',9:'06:28',10:'06:58',11:'06:40',12:'07:12'})[m]||'06:30'};
+const approxSS=ds=>{const m=+ds.substring(5,7);return({1:'16:43',2:'17:28',3:'18:58',4:'19:43',5:'20:08',6:'20:28',7:'20:18',8:'19:42',9:'19:18',10:'18:28',11:'16:58',12:'16:28'})[m]||'19:00'};
+
+// Get planet status
+function getPStatus(pn,lon){
+  const pd=PD[pn]; if(!pd)return{lbl:'',cls:'',dig:0};
+  const ri=Math.floor(lon/30)%12;
+  if(ri===pd.ex)return{lbl:'EXALTED',cls:'exalt',dig:2.5};
+  if(ri===pd.db)return{lbl:'DEBILITATED',cls:'debi',dig:-2.5};
+  if(pd.own.includes(ri))return{lbl:'OWN SIGN',cls:'own',dig:1.5};
+  if(pd.bull_r.includes(ri))return{lbl:'Friendly',cls:'',dig:0.8};
+  if(pd.bear_r.includes(ri))return{lbl:'Enemy',cls:'',dig:-0.8};
+  return{lbl:'Neutral',cls:'',dig:0};
+}
+
+function getPSignal(pn,lon){
+  const pd=PD[pn]; if(!pd)return{lbl:'Neutral',cls:'neut2'};
+  const rn=RASHI[Math.floor(lon/30)%12];
+  if(pd.bull_r.includes(Math.floor(lon/30)%12))return{lbl:'↑ Bullish influence',cls:'pos'};
+  if(pd.bear_r.includes(Math.floor(lon/30)%12))return{lbl:'↓ Bearish influence',cls:'neg'};
+  return{lbl:'Neutral',cls:'neut2'};
+}
+
+// Market impact description per planet
+function getPlanetMktImpact(pn, lon){
+  const ri=Math.floor(lon/30)%12;
+  const pd=PD[pn]; if(!pd)return'';
+  const dig=getPStatus(pn,lon).dig;
+  const rName=RASHI[ri];
+  let impact='';
+  if(pn==='moon'){
+    impact=dig>=1.5?'Moon strong → intraday stable, trending moves':dig<=-1.5?'Moon weak → choppy, emotional reversals':'Moon moderate → mixed intraday';
+  }else if(pn==='jupiter'){
+    impact=dig>=1.5?'Jupiter exalt/own → overall bullish bias, sustained trend':dig<=-1.5?'Jupiter weak → overall bearish, no follow-through':'Jupiter neutral → mixed trend';
+  }else if(pn==='saturn'){
+    impact=dig<=-1.5?'Saturn debil → resistance breaks easily, less drag':dig>=1.5?'Saturn strong → heavy resistance, slow grind down':'Saturn moderate';
+  }else if(pn==='mars'){
+    impact=dig>=1.5?'Mars strong → high volume, aggressive moves':dig<=-1.5?'Mars weak → false breakouts, traps':'Mars moderate → normal volatility';
+  }else if(pn==='mercury'){
+    impact=dig>=1.5?'Mercury exalt → clear direction, fast information':dig<=-1.5?'Mercury weak → confusion, mixed signals':'Mercury moderate';
+  }else if(pn==='venus'){
+    impact=dig>=1.5?'Venus strong → wealth flow, comfort buying':dig<=-1.5?'Venus weak → selling pressure':'Venus moderate';
+  }else if(pn==='sun'){
+    impact=dig>=1.5?'Sun strong → confidence, authority buying':'Sun moderate';
+  }else if(pn==='rahu'){
+    impact='Rahu → sudden moves, illusion traps · Watch for false breakouts';
+  }else if(pn==='ketu'){
+    impact='Ketu → uncertainty, sudden reversals · Be cautious at trend highs';
+  }
+  return impact;
+}
+
+// ════════════════════════════════════════════════════════════
+// SESSION ANALYSIS
+// ════════════════════════════════════════════════════════════
+function analyzeSession(rows, start, end, srH, wdIdx){
+  let sRows=rows.filter(r=>{
+    const t=r.ts_local?r.ts_local.substring(11):'';
+    return t>=start&&t<=end;
+  });
+  // Asian session wraps midnight
+  if(start==='19:00'&&sRows.length<10){
+    const eve=rows.filter(r=>{const t=r.ts_local?r.ts_local.substring(11):'';return t>='19:00'});
+    const morn=rows.filter(r=>{const t=r.ts_local?r.ts_local.substring(11):'';return t<='02:00'});
+    sRows=[...eve,...morn];
+  }
+  if(sRows.length<3)return null;
+
+  // Score each row
+  const scored=sRows.map((r,i)=>{
+    try{
+      const t=r.ts_local.substring(11);
+      const[h,m]=t.split(':').map(Number);
+      const hora=gHora(h+m/60,wdIdx,srH);
+      let moonSpd=null;
+      if(i>0){
+        let diff=+(sRows[i].moon_lon||0)-(+(sRows[i-1].moon_lon||0));
+        if(diff<-180)diff+=360; if(diff>180)diff-=360;
+        moonSpd=Math.abs(diff);
+      }
+      const sc=scoreRow(r,hora,moonSpd);
+      return{...r,_hora:hora,_score:sc.total,_layers:sc.layers,_moonSpd:moonSpd};
+    }catch(e){
+      return{...r,_hora:'Sun',_score:0,_layers:[],_moonSpd:null};
+    }
+  });
+
+  const avgScore=scored.reduce((a,r)=>a+r._score,0)/scored.length;
+  const normScore=Math.max(-10,Math.min(10,avgScore));
+
+  // Moon speed stats
+  const spds=scored.filter(r=>r._moonSpd!==null).map(r=>r._moonSpd);
+  const avgMoonSpd=spds.length?spds.reduce((a,v)=>a+v,0)/spds.length:null;
+  const maxMoonSpd=spds.length?Math.max(...spds):null;
+  const minMoonSpd=spds.length?Math.min(...spds):null;
+  // Convert to per-hour for display
+  const avgMoonSpdHr=avgMoonSpd?avgMoonSpd*60:null;
+
+  // Events
+  const events=[];
+  let lk=scored[0]?.karana_en, ln=scored[0]?.nakshatra_en, lt=scored[0]?.tithi_id, lrk=scored[0]?.is_rahu_kaal, lh=scored[0]?._hora;
+  for(const r of scored){
+    const tm=r.ts_local.substring(11);
+    if(r.karana_en&&r.karana_en!==lk){events.push({time:tm,type:'karana',head:'Karana Change',body:`${lk} → ${r.karana_en}`,cls:'karana',imp:'med'});lk=r.karana_en}
+    if(r.nakshatra_en&&r.nakshatra_en!==ln){events.push({time:tm,type:'nak',head:'Nakshatra Shift',body:`${ln} → ${r.nakshatra_en}`,cls:'nakshatra',imp:'high'});ln=r.nakshatra_en}
+    if(r.tithi_id&&r.tithi_id!==lt){const pn=scored.find(x=>x.tithi_id===lt)?.tithi_en||lt;events.push({time:tm,type:'tithi',head:'Tithi Change',body:`${pn} → ${r.tithi_en}`,cls:'tithi',imp:'high'});lt=r.tithi_id}
+    if((r.is_rahu_kaal==='1'||r.is_rahu_kaal===1)&&!(lrk==='1'||lrk===1)){events.push({time:tm,type:'rahu',head:'⚠ Rahu Kaal Begins',body:'Avoid new positions · High risk of loss',cls:'rahu',imp:'avoid'});lrk='1'}
+    if((r.is_rahu_kaal==='0'||r.is_rahu_kaal===0)&&(lrk==='1'||lrk===1)){events.push({time:tm,type:'rahu_end',head:'Rahu Kaal Ends',body:'Resume cautiously · Watch for trend resumption',cls:'karana',imp:'med'});lrk='0'}
+    if(r._hora!==lh){events.push({time:tm,type:'hora',head:`${r._hora} Hora Begins`,body:HORA_DESC[r._hora],cls:HORA_SCORE[r._hora]>=1?'good':'karana',imp:HORA_SCORE[r._hora]>=1.5?'good':HORA_SCORE[r._hora]<=-1?'high':'med'});lh=r._hora}
+  }
+
+  // Best/Worst 30-min windows
+  let bestSc=-99,bestSt='',bestEn='',worstSc=99,worstSt='',worstEn='';
+  for(let i=0;i<scored.length-30;i++){
+    const w=scored.slice(i,i+30);
+    const av=w.reduce((a,r)=>a+r._score,0)/30;
+    if(av>bestSc){bestSc=av;bestSt=scored[i].ts_local.substring(11);bestEn=scored[Math.min(i+29,scored.length-1)].ts_local.substring(11)}
+    if(av<worstSc){worstSc=av;worstSt=scored[i].ts_local.substring(11);worstEn=scored[Math.min(i+29,scored.length-1)].ts_local.substring(11)}
+  }
+
+  // Trading windows — detect directional blocks
+  const windows=[];
+  if(scored.length>5){
+    let ws=scored[0].ts_local.substring(11), wsig=scls(scored[0]._score), wsc=[scored[0]._score], wfacts=[];
+    for(let i=1;i<=scored.length;i++){
+      const r=scored[i];
+      const sig=r?scls(r._score):'end';
+      if(sig!==wsig||!r){
+        const avg=wsc.reduce((a,v)=>a+v,0)/wsc.length;
+        if(wsc.length>=5){
+          const action=wsig==='bull'?'BUY':wsig==='bear'?'SELL':avg<-0.5?'AVOID':'WATCH';
+          // Collect dominant factors for this window
+          const domFactors=[];
+          const sample=scored.slice(Math.max(0,i-wsc.length),i).slice(0,5);
+          sample.forEach(sr=>{
+            (sr._layers||[]).forEach(l=>{
+              if(Math.abs(l.raw)>=1)(l.factors||[]).forEach(f=>{if(Math.abs(f.s)>=0.5)domFactors.push(f.f)});
+            });
+          });
+          const topFactors=[...new Set(domFactors)].slice(0,3);
+          windows.push({start:ws,end:r?r.ts_local.substring(11):scored[scored.length-1].ts_local.substring(11),sig:wsig,avg,count:wsc.length,action,factors:topFactors});
+        }
+        if(r){ws=r.ts_local.substring(11);wsig=sig;wsc=[r._score]}
+      }else{wsc.push(r._score)}
+    }
+  }
+
+  // Layer averages
+  const layerAvg=(scored[0]._layers||[]).map((l,li)=>({
+    label:l.label, w:l.w,
+    avg:scored.reduce((a,r)=>a+(r._layers?.[li]?.score||0),0)/scored.length,
+    raw:scored.reduce((a,r)=>a+(r._layers?.[li]?.raw||0),0)/scored.length
+  }));
+
+  return{normScore,avgScore,scored,events,windows,bestSc,bestSt,bestEn,worstSc,worstSt,worstEn,avgMoonSpd,avgMoonSpdHr,maxMoonSpd,minMoonSpd,layerAvg,firstRow:scored[0],lastRow:scored[scored.length-1]};
+}
+
+// ════════════════════════════════════════════════════════════
+// SVG CHART
+// ════════════════════════════════════════════════════════════
+function mkChart(scored, strokeColor, W=900, H=110){
+  if(!scored||scored.length<2)return'<div style="height:110px;display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:.78rem">Not enough data for chart</div>';
+  // Sample every 2 minutes
+  const pts=scored.filter((_,i)=>i%2===0);
+  if(pts.length<2)return'';
+  const scores=pts.map(r=>r._score);
+  const mn=Math.min(...scores,-3), mx=Math.max(...scores,3);
+  const rng=mx-mn||1;
+  const xs=pts.map((_,i)=>i/(pts.length-1)*W);
+  const ys=pts.map(s=>H-(s-mn)/rng*H);
+  const line=xs.map((x,i)=>`${i===0?'M':'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const fill=`${line} L${W},${H} L0,${H} Z`;
+  const zy=H-(-mn)/rng*H;
+  // Rahu kaal zones
+  const rahuRects=[];
+  let rs=null;
+  pts.forEach((r,i)=>{
+    const isR=r.is_rahu_kaal==='1'||r.is_rahu_kaal===1;
+    if(isR&&!rs)rs=xs[i];
+    if(!isR&&rs){rahuRects.push(`<rect x="${rs.toFixed(1)}" y="0" width="${(xs[i]-rs).toFixed(1)}" height="${H}" fill="rgba(255,51,85,.1)" rx="2"/>`);rs=null}
+  });
+  // Best window marker
+  const gid=`g${Math.random().toString(36).substr(2,6)}`;
+  return`<div class="chart-box"><svg class="mc" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px">
+  <defs>
+    <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${strokeColor}" stop-opacity=".3"/>
+      <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  ${rahuRects.join('')}
+  <line x1="0" y1="${zy.toFixed(1)}" x2="${W}" y2="${zy.toFixed(1)}" stroke="rgba(255,255,255,.15)" stroke-width="1" stroke-dasharray="4,4"/>
+  <path d="${fill}" fill="url(#${gid})"/>
+  <path d="${line}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+</svg></div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER SESSION
+// ════════════════════════════════════════════════════════════
+function renderSess(sess, name, cls, color, timeRange, day){
+  if(!sess)return`<div style="padding:28px;text-align:center;color:var(--t2)">No ${name} data available for this day.</div>`;
+
+  const sc=sess.normScore, col=scol(sc), sig=ssig(sc), sigcls=scls(sc);
+  const fr=sess.firstRow||{};
+
+  // ── HERO ──
+  const hero=`<div class="hero ${cls}">
+    <div class="hero-grid">
+      <div>
+        <div class="hl">${name.toUpperCase()}</div>
+        <div class="hv" style="margin-bottom:6px"><b>${timeRange}</b> NY Time</div>
+        <div class="hv">${day.date} · ${day.weekday} · ${day.weekdayHi}</div>
+        <div class="hv">☀ Sunrise <b>${day.sunrise}</b> · Sunset <b>${day.sunset}</b></div>
+      </div>
+      <div>
+        <div class="hl">BEST BUY WINDOW</div>
+        <div class="hv"><b style="color:var(--bull)">${sess.bestSt} – ${sess.bestEn}</b></div>
+        <div class="hv" style="font-size:.7rem">Score ${ss(sess.bestSc)}</div>
+      </div>
+      <div>
+        <div class="hl">BEST SELL / AVOID</div>
+        <div class="hv"><b style="color:var(--bear)">${sess.worstSt} – ${sess.worstEn}</b></div>
+        <div class="hv" style="font-size:.7rem">Score ${ss(sess.worstSc)}</div>
+      </div>
+      <div>
+        <div class="big-score" style="color:${col}">${ss(sc)}</div>
+        <div class="big-sig" style="color:${col}">${sig}</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── 3 SIGNAL CARDS ──
+  const mi=Math.floor(sess.scored.length/2);
+  const osc=sess.scored[0]?._score||0, msc=sess.scored[mi]?._score||0, csc=sess.scored[sess.scored.length-1]?._score||0;
+  const sig3=`<div class="sig3">
+    <div class="sig-c ${scls(osc)}">
+      <div class="sig-lbl">SESSION OPEN</div>
+      <div class="sig-main" style="color:${scol(osc)}">${ssig(osc)}</div>
+      <div class="sig-sub">Score <b>${ss(osc)}</b></div>
+      <div class="sig-sub"><b>${sess.scored[0]?._hora||''}</b> Hora · ${sess.scored[0]?.tithi_en||''}</div>
+      <div class="sig-sub">${sess.scored[0]?.nakshatra_en||''} · ${sess.scored[0]?.karana_en||''}</div>
+    </div>
+    <div class="sig-c ${scls(msc)}">
+      <div class="sig-lbl">MID SESSION</div>
+      <div class="sig-main" style="color:${scol(msc)}">${ssig(msc)}</div>
+      <div class="sig-sub">Score <b>${ss(msc)}</b></div>
+      <div class="sig-sub"><b>${sess.scored[mi]?._hora||''}</b> Hora · ${sess.scored[mi]?.tithi_en||''}</div>
+      <div class="sig-sub">${sess.scored[mi]?.nakshatra_en||''} · ${sess.scored[mi]?.karana_en||''}</div>
+    </div>
+    <div class="sig-c ${scls(csc)}">
+      <div class="sig-lbl">SESSION CLOSE</div>
+      <div class="sig-main" style="color:${scol(csc)}">${ssig(csc)}</div>
+      <div class="sig-sub">Score <b>${ss(csc)}</b></div>
+      <div class="sig-sub"><b>${sess.scored[sess.scored.length-1]?._hora||''}</b> Hora · ${sess.scored[sess.scored.length-1]?.tithi_en||''}</div>
+      <div class="sig-sub">${sess.scored[sess.scored.length-1]?.nakshatra_en||''}</div>
+    </div>
+  </div>`;
+
+  // ── SCORE BREAKDOWN ──
+  const bkRows=sess.layerAvg.map(l=>{
+    const pct=Math.min(100,Math.abs(l.raw)/3*100);
+    const bc=l.raw>=0?'var(--bull)':'var(--bear)';
+    const vc=l.raw>0.1?'pos':l.raw<-0.1?'neg':'z';
+    return`<div class="bk-row">
+      <div class="bk-lbl">${l.label}</div>
+      <div class="bk-bar-bg"><div class="bk-bar-fill" style="width:${pct}%;background:${bc}"></div></div>
+      <div class="bk-val ${vc}">${ss(l.raw)}</div>
+      <div class="bk-w">${l.w}%</div>
+    </div>`;
+  }).join('');
+  const breakdown=`<div class="card">
+    <div class="card-title">10-LAYER SCORE BREAKDOWN (session average)</div>
+    ${bkRows}
+  </div>`;
+
+  // ── CHART ──
+  const chart=`<div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between">
+      <span>1-MINUTE SCORE CHART · ${name}</span>
+      <span style="color:var(--t3)">Red zones=Rahu Kaal · Dashed=Neutral (0)</span>
+    </div>
+    ${mkChart(sess.scored, color)}
+  </div>`;
+
+  // ── MOON SPEED ──
+  const spdHr=sess.avgMoonSpdHr;
+  const spdCond=spdHr>0.65?'FAST · High volatility':spdHr<0.45?'SLOW · Stable trend':'NORMAL · Steady';
+  const spdCol=spdHr>0.65?'var(--bear)':spdHr<0.45?'var(--bull)':'var(--neut)';
+  const moonCard=`<div class="moon3">
+    <div class="m3c">
+      <div class="m3v" style="color:var(--acc)">${sess.avgMoonSpd?sess.avgMoonSpd.toFixed(6)+'°/min':'N/A'}</div>
+      <div class="m3l">Avg Moon Speed per Minute</div>
+    </div>
+    <div class="m3c">
+      <div class="m3v" style="color:var(--gold)">${spdHr?spdHr.toFixed(4)+'°/hr':'N/A'}</div>
+      <div class="m3l">Moon Speed per Hour</div>
+    </div>
+    <div class="m3c">
+      <div class="m3v" style="color:${spdCol}">${spdCond}</div>
+      <div class="m3l">Moon Condition → Market</div>
+    </div>
+  </div>`;
+
+  // ── 9 PLANET CARDS ──
+  const pkeys=[['sun','sun_lon'],['moon','moon_lon'],['mars','mars_lon'],['mercury','mercury_lon'],['jupiter','jupiter_lon'],['venus','venus_lon'],['saturn','saturn_lon'],['rahu','rahu_lon'],['ketu','ketu_lon']];
+  const pcards=pkeys.map(([pn,col2])=>{
+    const lon=+(fr[col2]||0);
+    const ri=getRashi(lon);
+    const st=getPStatus(pn,lon);
+    const sg=getPSignal(pn,lon);
+    const pd=PD[pn];
+    const impact=getPlanetMktImpact(pn,lon);
+    return`<div class="pc ${pn}">
+      <div class="pcn">${pd?.n||pn}</div>
+      <div class="pcl">${lon.toFixed(4)}°</div>
+      <div class="pcr">${RASHI[ri]} / ${RASHI_HI[ri]}</div>
+      ${st.cls?`<span class="pcs ${st.cls}">${st.lbl}</span>`:`<span style="font-size:.6rem;color:var(--t3)">${st.lbl}</span>`}
+      <div class="pcsig ${sg.cls}">${sg.lbl}</div>
+      ${impact?`<div class="pc-impact">${impact}</div>`:''}
+    </div>`;
+  }).join('');
+  const planetGrid=`<div class="card">
+    <div class="card-title">9 GRAHA — Individual Planet Analysis at Session Open</div>
+    <div class="pg9">${pcards}</div>
+  </div>`;
+
+  // ── PLANETARY ASPECTS ──
+  const aspData=sess.layerAvg.find(l=>l.label==='Graha Aspects');
+  const aspFactors=(scoreRow(fr||{},sess.scored[0]?._hora||'Sun',null).layers[5]?.aspDetails)||[];
+  const aspRows=aspFactors.slice(0,10).map(f=>{
+    const col2=f.bull?'var(--bull)':f.bull===false?'var(--bear)':'var(--neut)';
+    const imp=f.bull?'↑ Bullish':f.bull===false?'↓ Bearish':'↔ Neutral';
+    return`<div class="asp-row">
+      <div>${f.f||''}</div>
+      <div style="font-family:var(--fm);color:var(--t2)">${f.asp||''}</div>
+      <div style="color:${col2};font-weight:600">${imp}</div>
+      <div style="color:var(--t2)">${ss(f.s||0)}</div>
+    </div>`;
+  }).join('');
+  const aspCard=aspRows?`<div class="card">
+    <div class="card-title">PLANETARY ASPECTS — Active Influences</div>
+    <div class="asp-row asp-head"><div>PLANETS · ASPECT · ANGLE</div><div>TYPE</div><div>MARKET EFFECT</div><div>SCORE</div></div>
+    ${aspRows}
+  </div>`:'';
+
+  // ── KEY EVENTS ──
+  const evCards=sess.events.filter(e=>e.type!=='hora'||HORA_SCORE[e.head?.split(' ')[0]]>=1.5).slice(0,8).map(e=>`<div class="ev-c ${e.cls}">
+    <div class="ev-t">⚡ ${e.time}</div>
+    <div class="ev-h">${e.head}</div>
+    <div class="ev-b">${e.body}</div>
+    <span class="ev-imp ${e.imp}">${e.imp.toUpperCase()}</span>
+  </div>`).join('');
+  const evWrap=evCards?`<div class="card">
+    <div class="card-title">KEY EVENTS & REVERSAL POINTS IN SESSION</div>
+    <div class="ev-grid">${evCards}</div>
+  </div>`:'';
+
+  // ── TRADING WINDOWS ──
+  const winRows=sess.windows.filter(w=>w.count>=5).map(w=>`<div class="win-row ${w.action}">
+    <span class="win-badge ${w.action}">${w.action}</span>
+    <div class="win-body">
+      <div class="win-time">${w.start} – ${w.end} <span style="color:var(--t3)">(${w.count} min)</span></div>
+      <div class="win-score ${w.avg>=0?'pos':'neg'}">${ss(w.avg)} composite score</div>
+      <div class="win-reason">${w.action==='BUY'?'Bullish momentum · Favorable planets':w.action==='SELL'?'Bearish pressure · Inauspicious':w.action==='AVOID'?'Rahu/inauspicious · Avoid new positions':'Watch for direction'}</div>
+      ${w.factors.length?`<div class="win-factors">Driven by: ${w.factors.join(' · ')}</div>`:''}
+    </div>
+  </div>`).join('');
+  const winCard=`<div class="card">
+    <div class="card-title">TRADING WINDOWS — BUY · SELL · AVOID (from 1-minute signal)</div>
+    ${winRows||'<div style="color:var(--t2);font-size:.78rem;padding:4px 0">No strong 5-minute directional windows. Market likely choppy.</div>'}
+  </div>`;
+
+  // ── MINUTE TIMELINE ──
+  const tlRows=sess.scored.filter((_,i)=>{
+    const t=_.ts_local.substring(11);
+    return i%10===0||sess.events.some(e=>e.time===t);
+  }).slice(0,90).map(r=>{
+    const t=r.ts_local.substring(11);
+    const ev=sess.events.find(e=>e.time===t);
+    const isRahu=r.is_rahu_kaal==='1'||r.is_rahu_kaal===1;
+    const evCls=isRahu?'r-rahu':ev?.type==='karana'?'r-karana':ev?.type==='nak'?'r-nak':ev?.type==='tithi'?'r-tithi':'';
+    const sc2=r._score, sc2cls=scls(sc2);
+    const mspd=r._moonSpd?r._moonSpd.toFixed(5):'—';
+    const sig2=sc2>=2.5?'↑ BUY':sc2<=-2.5?'↓ SELL':'↔ FLAT';
+    return`<div class="tl-r ${evCls}">
+      <div class="tl-time">${t}</div>
+      <div class="tl-hora ${HORA_CLS[r._hora]||''}">${r._hora}</div>
+      <div class="tl-sig ${sc2cls}">${sig2}</div>
+      <div class="tl-moon">${mspd}°</div>
+      <div class="tl-pc">${r.tithi_en||''} · ${r.nakshatra_en||''} · ${r.karana_en||''}</div>
+      <div class="tl-score ${sc2>=0?'pos':'neg'}">${ss(sc2)}</div>
+    </div>`;
+  }).join('');
+  const timeline=`<div class="tl-card">
+    <div class="tl-hd"><div>TIME</div><div>HORA</div><div>SIGNAL</div><div>MOON°/MIN</div><div>PANCHANG</div><div>SCORE</div></div>
+    ${tlRows}
+  </div>`;
+
+  return hero+sig3+breakdown+chart+moonCard+evWrap+winCard+planetGrid+aspCard+timeline+`<div class="disc">⚠ Research & educational use only. Not financial advice. Vedic astrology is probabilistic. Always use proper risk management and stop-loss.</div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// COMBINED VIEW
+// ════════════════════════════════════════════════════════════
+function renderCombined(days){
+  const html=days.map(day=>{
+    const asc=day.asian?.normScore||0, lsc=day.london?.normScore||0, nsc=day.ny?.normScore||0;
+    const tot=asc*0.2+lsc*0.3+nsc*0.5;
+    const id='cc'+day.date.replace(/-/g,'');
+    const mkB=(sess,lbl,c)=>{
+      if(!sess)return`<div class="cc-blk"><div class="cc-bh ${c}">${lbl}</div><div style="color:var(--t2);font-size:.72rem">No data</div></div>`;
+      const s=sess.normScore;
+      const evs=sess.events.filter(e=>e.type!=='hora').slice(0,4).map(e=>`<div class="cc-ev-row">⚡ ${e.time} ${e.head}</div>`).join('');
+      const mspd=sess.avgMoonSpdHr?sess.avgMoonSpdHr.toFixed(4)+'°/hr':'N/A';
+      return`<div class="cc-blk">
+        <div class="cc-bh ${c}">${lbl}</div>
+        <div style="font-size:1rem;font-weight:700;color:${scol(s)};font-family:var(--fh);margin-bottom:6px">${ss(s)} ${ssig(s)}</div>
+        <div class="cc-stat">Buy: <b style="color:var(--bull)">${sess.bestSt}–${sess.bestEn}</b></div>
+        <div class="cc-stat">Avoid: <b style="color:var(--bear)">${sess.worstSt}–${sess.worstEn}</b></div>
+        <div class="cc-stat">Moon: <b>${mspd}</b></div>
+        ${evs}
+      </div>`;
+    };
+    return`<div class="cc">
+      <div class="cc-hdr" onclick="tCC('${id}')">
+        <div><div class="cc-date">${day.date} · ${day.weekday}</div><div class="cc-wd">${day.weekdayHi} · ☀${day.sunrise}→${day.sunset}</div></div>
+        <div class="cc-s"><div class="cc-sl asian">ASIAN</div><div class="cc-sv" style="color:${scol(asc)}">${ss(asc)}</div></div>
+        <div class="cc-s"><div class="cc-sl london">LONDON</div><div class="cc-sv" style="color:${scol(lsc)}">${ss(lsc)}</div></div>
+        <div class="cc-s"><div class="cc-sl ny">NEW YORK</div><div class="cc-sv" style="color:${scol(nsc)}">${ss(nsc)}</div></div>
+        <div class="cc-tot" style="color:${scol(tot)}">${ss(tot)}</div>
+      </div>
+      <div class="cc-body" id="${id}">
+        <div class="cc-g">${mkB(day.asian,'🌏 ASIAN','asian')}${mkB(day.london,'🏦 LONDON','london')}${mkB(day.ny,'🗽 NEW YORK','ny')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('sv-comb').innerHTML=html;
+}
+function tCC(id){const e=document.getElementById(id);if(e)e.classList.toggle('open')}
+
+// ════════════════════════════════════════════════════════════
+// DAY COORDINATOR
+// ════════════════════════════════════════════════════════════
+function analyzeDay(rows){
+  if(!rows||rows.length<5)return null;
+  const base=rows.find(r=>r.ts_local&&r.ts_local.substring(11)==='09:30')||rows[0];
+  const date=base.ts_local.substring(0,10);
+  // Fix: Calculate weekday from date if CSV field missing/wrong
+  let wdName=base.weekday_en||'';
+  if(!WD.includes(wdName)){
+    const[y,m,d]=date.split('-').map(Number);
+    wdName=WD[new Date(Date.UTC(y,m-1,d)).getUTCDay()];
+  }
+  const wd=WD.indexOf(wdName);
+  const srRow=rows.find(r=>r.sunrise_local&&r.sunrise_local!=='N/A');
+  const sunrise=srRow?srRow.sunrise_local:approxSR(date);
+  const sunset=srRow?srRow.sunset_local:approxSS(date);
+  const srH=tH(sunrise);
+
+  const asian=analyzeSession(rows,'19:00','23:59',srH,wd);
+  const london=analyzeSession(rows,'03:00','09:29',srH,wd);
+  const ny=analyzeSession(rows,'09:30','15:59',srH,wd);
+
+  const nySc=ny?.normScore||0,ldSc=london?.normScore||0,asSc=asian?.normScore||0;
+  const dayScore=nySc*0.5+ldSc*0.3+asSc*0.2;
+  // Fix: use calculated wdName not raw CSV field
+  const isWknd=wdName==='Saturday'||wdName==='Sunday';
+  return{date,weekday:wdName,weekdayHi:base.weekday_hi||'',wd,sunrise,sunset,dayScore,daySc:scls(dayScore),daySig:ssig(dayScore),asian,london,ny,isWknd};
+}
+
+// ════════════════════════════════════════════════════════════
+// CSV PARSER
+// ════════════════════════════════════════════════════════════
+function parseCSV(txt){
+  const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+  const sep=lines[0].split('\t').length>5?'\t':',';
+  const clean=h=>h.replace(/^\uFEFF/,'').replace(/^"|"$/g,'').trim();
+  const hdrs=lines[0].split(sep).map(clean);
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const vals=sep==='\t'?lines[i].split('\t'):splitC(lines[i]);
+    if(vals.length<5)continue;
+    const row={};hdrs.forEach((h,j)=>row[h]=(vals[j]||'').replace(/^"|"$/g,'').trim());
+    if(row.ts_local)rows.push(row);
+  }
+  return rows;
+}
+function splitC(l){const r=[];let c='',q=false;for(const ch of l){if(ch==='"'){q=!q;continue}if(ch===','&&!q){r.push(c);c='';continue}c+=ch}r.push(c);return r}
+function groupDate(rows){const m={};for(const r of rows){const d=r.ts_local?.substring(0,10);if(!d)continue;(m[d]=m[d]||[]).push(r)}return m}
+
+// ════════════════════════════════════════════════════════════
+// UI
+// ════════════════════════════════════════════════════════════
+let allDays=[],selIdx=0,curTab='asian';
+const $=id=>document.getElementById(id);
+function setSt(m,t=''){$('st').textContent=m;$('st').className=t}
+function setProg(p){$('pr').style.display='block';$('prf').style.width=p+'%';$('prl').textContent=Math.round(p)+'%'}
+
+function selectDay(idx){
+  selIdx=idx;
+  document.querySelectorAll('.pki').forEach((c,i)=>c.classList.toggle('sel',i===idx));
+  const day=allDays[idx];if(!day)return;
+  $('sv-asian').innerHTML=renderSess(day.asian,'Asian Session','asian','#f472b6','19:00–23:59',day);
+  $('sv-london').innerHTML=renderSess(day.london,'London Session','london','#60a5fa','03:00–09:29',day);
+  $('sv-ny').innerHTML=renderSess(day.ny,'New York Session','ny','#34d399','09:30–15:59',day);
+  $('main').style.display='block';
+  switchTab(curTab);
+  $('main').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function switchTab(name){
+  curTab=name;
+  document.querySelectorAll('.stab').forEach(t=>{t.classList.remove('on');if(t.dataset.s===name)t.classList.add('on')});
+  document.querySelectorAll('.sv').forEach(v=>{v.classList.remove('on');if(v.id==='sv-'+name)v.classList.add('on')});
+}
+document.querySelectorAll('.stab').forEach(t=>t.addEventListener('click',()=>switchTab(t.dataset.s)));
+
+function renderPicker(days){
+  const g=$('pkg');g.innerHTML='';
+  days.forEach((d,i)=>{
+    const wknd=d.weekday==='Saturday'||d.weekday==='Sunday';
+    const c=document.createElement('div');
+    c.className=`pki ${d.daySc}${wknd?' wknd':''}`;
+    c.innerHTML=`<div class="pkid">${d.date.substring(5)}</div><div class="pkis">${ss(d.dayScore)}</div>`;
+    c.addEventListener('click',()=>selectDay(i));
+    g.appendChild(c);
+  });
+  $('pk').style.display='block';
+}
+
+async function processFile(file){
+  try{
+    setSt(`Loading ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)…`);setProg(5);await sleep(10);
+    const txt=await file.text();
+    setSt('Parsing CSV…');setProg(12);await sleep(10);
+    const rows=parseCSV(txt);
+    if(rows.length<100){setSt('❌ Invalid CSV — check file format','err');return}
+    setSt(`${rows.length.toLocaleString()} rows parsed. Grouping by date…`);setProg(20);await sleep(10);
+    const byDate=groupDate(rows);
+    const dates=Object.keys(byDate).sort();
+    setSt(`Found ${dates.length} days. Starting analysis…`);setProg(28);await sleep(10);
+    allDays=[];
+    for(let i=0;i<dates.length;i++){
+      try{
+        const a=analyzeDay(byDate[dates[i]]);
+        if(a)allDays.push(a);
+      }catch(e){
+        console.warn('Day error:',dates[i],e.message);
+      }
+      // Yield to browser every single day
+      setProg(28+Math.round(i/dates.length*57));
+      setSt(`Analyzing day ${i+1}/${dates.length}: ${dates[i]} … (${allDays.length} done)`);
+      await sleep(0);
+    }
+    setProg(87);setSt('Building combined report…');await sleep(10);
+    const td=allDays.filter(d=>!d.isWknd);
+    $('s1').textContent=td.filter(d=>d.dayScore>=2.5).length;
+    $('s2').textContent=td.filter(d=>d.dayScore<=-2.5).length;
+    $('s3').textContent=td.filter(d=>d.dayScore>-2.5&&d.dayScore<2.5).length;
+    $('s4').textContent=td.length;
+    $('s5').textContent=(rows.length/1000).toFixed(1)+'K';
+    $('sum').style.display='grid';
+    setProg(92);await sleep(10);
+    renderPicker(allDays);
+    setProg(96);await sleep(10);
+    renderCombined(allDays);
+    setProg(100);
+    setSt(`✅ ${allDays.length} days · ${rows.length.toLocaleString()} rows · 10-layer + 9-planet analysis complete · Click any date above`,'ok');
+    const first=allDays.findIndex(d=>d.weekday!=='Saturday'&&d.weekday!=='Sunday');
+    if(first>=0)selectDay(first);
+  }catch(e){
+    console.error('Processing error:',e);
+    setSt('❌ Error: '+e.message,'err');
+  }
+}
+
+$('fi').addEventListener('change',function(){if(this.files[0])processFile(this.files[0])});
+const DZ=$('dz');
+DZ.addEventListener('dragover',e=>{e.preventDefault();DZ.classList.add('drag')});
+DZ.addEventListener('dragleave',()=>DZ.classList.remove('drag'));
+DZ.addEventListener('drop',e=>{e.preventDefault();DZ.classList.remove('drag');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0])});
+</script>
+</body>
+</html>

@@ -507,6 +507,10 @@ function scoreRow(row, hora, moonSpd){
 // ════════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════════
+// Normalize time '9:30' -> '09:30' for correct string comparison
+const normTime=t=>{if(!t)return'';const p=t.split(':');return p[0].padStart(2,'0')+':'+(p[1]||'00').padStart(2,'0')};
+// Normalize ts_local time part
+const getTLocal=r=>{const s=r.ts_local||'';const sp=s.indexOf(' ');return sp>=0?normTime(s.substring(sp+1)):'00:00'};
 const getRashi=lon=>Math.floor(((+lon)%360)/30);
 const wdN=n=>WD.indexOf(n);
 const tH=s=>(!s||s==='N/A')?6.5:(([h,m]=s.split(':').map(Number)),h+m/60);
@@ -573,13 +577,13 @@ function getPlanetMktImpact(pn, lon){
 // ════════════════════════════════════════════════════════════
 function analyzeSession(rows, start, end, srH, wdIdx){
   let sRows=rows.filter(r=>{
-    const t=r.ts_local?r.ts_local.substring(11):'';
+    const t=getTLocal(r);
     return t>=start&&t<=end;
   });
   // Asian session wraps midnight
   if(start==='19:00'&&sRows.length<10){
-    const eve=rows.filter(r=>{const t=r.ts_local?r.ts_local.substring(11):'';return t>='19:00'});
-    const morn=rows.filter(r=>{const t=r.ts_local?r.ts_local.substring(11):'';return t<='02:00'});
+    const eve=rows.filter(r=>{const t=getTLocal(r);return t>='19:00'});
+    const morn=rows.filter(r=>{const t=getTLocal(r);return t<='02:00'});
     sRows=[...eve,...morn];
   }
   if(sRows.length<3)return null;
@@ -587,7 +591,7 @@ function analyzeSession(rows, start, end, srH, wdIdx){
   // Score each row
   const scored=sRows.map((r,i)=>{
     try{
-      const t=r.ts_local.substring(11);
+      const t=getTLocal(r);
       const[h,m]=t.split(':').map(Number);
       const hora=gHora(h+m/60,wdIdx,srH);
       let moonSpd=null;
@@ -618,7 +622,7 @@ function analyzeSession(rows, start, end, srH, wdIdx){
   const events=[];
   let lk=scored[0]?.karana_en, ln=scored[0]?.nakshatra_en, lt=scored[0]?.tithi_id, lrk=scored[0]?.is_rahu_kaal, lh=scored[0]?._hora;
   for(const r of scored){
-    const tm=r.ts_local.substring(11);
+    const tm=getTLocal(r);
     if(r.karana_en&&r.karana_en!==lk){events.push({time:tm,type:'karana',head:'Karana Change',body:`${lk} → ${r.karana_en}`,cls:'karana',imp:'med'});lk=r.karana_en}
     if(r.nakshatra_en&&r.nakshatra_en!==ln){events.push({time:tm,type:'nak',head:'Nakshatra Shift',body:`${ln} → ${r.nakshatra_en}`,cls:'nakshatra',imp:'high'});ln=r.nakshatra_en}
     if(r.tithi_id&&r.tithi_id!==lt){const pn=scored.find(x=>x.tithi_id===lt)?.tithi_en||lt;events.push({time:tm,type:'tithi',head:'Tithi Change',body:`${pn} → ${r.tithi_en}`,cls:'tithi',imp:'high'});lt=r.tithi_id}
@@ -632,8 +636,8 @@ function analyzeSession(rows, start, end, srH, wdIdx){
   for(let i=0;i<scored.length-30;i++){
     const w=scored.slice(i,i+30);
     const av=w.reduce((a,r)=>a+r._score,0)/30;
-    if(av>bestSc){bestSc=av;bestSt=scored[i].ts_local.substring(11);bestEn=scored[Math.min(i+29,scored.length-1)].ts_local.substring(11)}
-    if(av<worstSc){worstSc=av;worstSt=scored[i].ts_local.substring(11);worstEn=scored[Math.min(i+29,scored.length-1)].ts_local.substring(11)}
+    if(av>bestSc){bestSc=av;bestSt=getTLocal(scored[i]);bestEn=getTLocal(scored[Math.min(i+29,scored.length-1)])}
+    if(av<worstSc){worstSc=av;worstSt=getTLocal(scored[i]);worstEn=getTLocal(scored[Math.min(i+29,scored.length-1)])}
   }
 
   // Trading windows — detect directional blocks
@@ -656,7 +660,7 @@ function analyzeSession(rows, start, end, srH, wdIdx){
             });
           });
           const topFactors=[...new Set(domFactors)].slice(0,3);
-          windows.push({start:ws,end:r?r.ts_local.substring(11):scored[scored.length-1].ts_local.substring(11),sig:wsig,avg,count:wsc.length,action,factors:topFactors});
+          windows.push({start:ws,end:r?getTLocal(r):getTLocal(scored[scored.length-1]),sig:wsig,avg,count:wsc.length,action,factors:topFactors});
         }
         if(r){ws=r.ts_local.substring(11);wsig=sig;wsc=[r._score]}
       }else{wsc.push(r._score)}
@@ -894,7 +898,7 @@ function renderSess(sess, name, cls, color, timeRange, day){
     const t=_.ts_local.substring(11);
     return i%10===0||sess.events.some(e=>e.time===t);
   }).slice(0,90).map(r=>{
-    const t=r.ts_local.substring(11);
+    const t=getTLocal(r);
     const ev=sess.events.find(e=>e.time===t);
     const isRahu=r.is_rahu_kaal==='1'||r.is_rahu_kaal===1;
     const evCls=isRahu?'r-rahu':ev?.type==='karana'?'r-karana':ev?.type==='nak'?'r-nak':ev?.type==='tithi'?'r-tithi':'';
@@ -962,7 +966,7 @@ function tCC(id){const e=document.getElementById(id);if(e)e.classList.toggle('op
 // ════════════════════════════════════════════════════════════
 function analyzeDay(rows){
   if(!rows||rows.length<5)return null;
-  const base=rows.find(r=>r.ts_local&&r.ts_local.substring(11)==='09:30')||rows[0];
+  const base=rows.find(r=>r.ts_local&&getTLocal(r)==='09:30')||rows[Math.floor(rows.length*0.4)]||rows[0];
   const date=base.ts_local.substring(0,10);
   // Fix: Calculate weekday from date if CSV field missing/wrong
   let wdName=base.weekday_en||'';

@@ -586,18 +586,21 @@ function analyzeSession(rows, start, end, srH, wdIdx){
 
   // Score each row
   const scored=sRows.map((r,i)=>{
-    const t=r.ts_local.substring(11);
-    const[h,m]=t.split(':').map(Number);
-    const hora=gHora(h+m/60,wdIdx,srH);
-    // Moon speed from prev row (deg/min)
-    let moonSpd=null;
-    if(i>0){
-      let diff=+(sRows[i].moon_lon||0)-(+(sRows[i-1].moon_lon||0));
-      if(diff<-180)diff+=360; if(diff>180)diff-=360;
-      moonSpd=Math.abs(diff);
+    try{
+      const t=r.ts_local.substring(11);
+      const[h,m]=t.split(':').map(Number);
+      const hora=gHora(h+m/60,wdIdx,srH);
+      let moonSpd=null;
+      if(i>0){
+        let diff=+(sRows[i].moon_lon||0)-(+(sRows[i-1].moon_lon||0));
+        if(diff<-180)diff+=360; if(diff>180)diff-=360;
+        moonSpd=Math.abs(diff);
+      }
+      const sc=scoreRow(r,hora,moonSpd);
+      return{...r,_hora:hora,_score:sc.total,_layers:sc.layers,_moonSpd:moonSpd};
+    }catch(e){
+      return{...r,_hora:'Sun',_score:0,_layers:[],_moonSpd:null};
     }
-    const sc=scoreRow(r,hora,moonSpd);
-    return{...r,_hora:hora,_score:sc.total,_layers:sc.layers,_moonSpd:moonSpd};
   });
 
   const avgScore=scored.reduce((a,r)=>a+r._score,0)/scored.length;
@@ -961,7 +964,13 @@ function analyzeDay(rows){
   if(!rows||rows.length<5)return null;
   const base=rows.find(r=>r.ts_local&&r.ts_local.substring(11)==='09:30')||rows[0];
   const date=base.ts_local.substring(0,10);
-  const wd=wdN(base.weekday_en||'');
+  // Fix: Calculate weekday from date if CSV field missing/wrong
+  let wdName=base.weekday_en||'';
+  if(!WD.includes(wdName)){
+    const[y,m,d]=date.split('-').map(Number);
+    wdName=WD[new Date(Date.UTC(y,m-1,d)).getUTCDay()];
+  }
+  const wd=WD.indexOf(wdName);
   const srRow=rows.find(r=>r.sunrise_local&&r.sunrise_local!=='N/A');
   const sunrise=srRow?srRow.sunrise_local:approxSR(date);
   const sunset=srRow?srRow.sunset_local:approxSS(date);
@@ -973,7 +982,9 @@ function analyzeDay(rows){
 
   const nySc=ny?.normScore||0,ldSc=london?.normScore||0,asSc=asian?.normScore||0;
   const dayScore=nySc*0.5+ldSc*0.3+asSc*0.2;
-  return{date,weekday:base.weekday_en||'',weekdayHi:base.weekday_hi||'',wd,sunrise,sunset,dayScore,daySc:scls(dayScore),daySig:ssig(dayScore),asian,london,ny};
+  // Fix: use calculated wdName not raw CSV field
+  const isWknd=wdName==='Saturday'||wdName==='Sunday';
+  return{date,weekday:wdName,weekdayHi:base.weekday_hi||'',wd,sunrise,sunset,dayScore,daySc:scls(dayScore),daySig:ssig(dayScore),asian,london,ny,isWknd};
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1037,35 +1048,49 @@ function renderPicker(days){
 }
 
 async function processFile(file){
-  setSt(`Loading ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)…`);setProg(5);await sleep(0);
-  const txt=await file.text();
-  setSt('Parsing CSV…');setProg(12);await sleep(0);
-  const rows=parseCSV(txt);
-  if(rows.length<100){setSt('❌ Invalid CSV','err');return}
-  setSt(`${rows.length.toLocaleString()} rows. Grouping by date…`);setProg(22);await sleep(0);
-  const byDate=groupDate(rows);
-  const dates=Object.keys(byDate).sort();
-  setSt(`Analyzing ${dates.length} days × 3 sessions × 10 layers…`);setProg(30);await sleep(0);
-  allDays=[];
-  for(let i=0;i<dates.length;i++){
-    const a=analyzeDay(byDate[dates[i]]);
-    if(a)allDays.push(a);
-    if(i%2===0){setProg(30+i/dates.length*55);await sleep(0)}
+  try{
+    setSt(`Loading ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)…`);setProg(5);await sleep(10);
+    const txt=await file.text();
+    setSt('Parsing CSV…');setProg(12);await sleep(10);
+    const rows=parseCSV(txt);
+    if(rows.length<100){setSt('❌ Invalid CSV — check file format','err');return}
+    setSt(`${rows.length.toLocaleString()} rows parsed. Grouping by date…`);setProg(20);await sleep(10);
+    const byDate=groupDate(rows);
+    const dates=Object.keys(byDate).sort();
+    setSt(`Found ${dates.length} days. Starting analysis…`);setProg(28);await sleep(10);
+    allDays=[];
+    for(let i=0;i<dates.length;i++){
+      try{
+        const a=analyzeDay(byDate[dates[i]]);
+        if(a)allDays.push(a);
+      }catch(e){
+        console.warn('Day error:',dates[i],e.message);
+      }
+      // Yield to browser every single day
+      setProg(28+Math.round(i/dates.length*57));
+      setSt(`Analyzing day ${i+1}/${dates.length}: ${dates[i]} … (${allDays.length} done)`);
+      await sleep(0);
+    }
+    setProg(87);setSt('Building combined report…');await sleep(10);
+    const td=allDays.filter(d=>!d.isWknd);
+    $('s1').textContent=td.filter(d=>d.dayScore>=2.5).length;
+    $('s2').textContent=td.filter(d=>d.dayScore<=-2.5).length;
+    $('s3').textContent=td.filter(d=>d.dayScore>-2.5&&d.dayScore<2.5).length;
+    $('s4').textContent=td.length;
+    $('s5').textContent=(rows.length/1000).toFixed(1)+'K';
+    $('sum').style.display='grid';
+    setProg(92);await sleep(10);
+    renderPicker(allDays);
+    setProg(96);await sleep(10);
+    renderCombined(allDays);
+    setProg(100);
+    setSt(`✅ ${allDays.length} days · ${rows.length.toLocaleString()} rows · 10-layer + 9-planet analysis complete · Click any date above`,'ok');
+    const first=allDays.findIndex(d=>d.weekday!=='Saturday'&&d.weekday!=='Sunday');
+    if(first>=0)selectDay(first);
+  }catch(e){
+    console.error('Processing error:',e);
+    setSt('❌ Error: '+e.message,'err');
   }
-  setProg(88);setSt('Building reports…');await sleep(0);
-  const td=allDays.filter(d=>d.weekday!=='Saturday'&&d.weekday!=='Sunday');
-  $('s1').textContent=td.filter(d=>d.dayScore>=2.5).length;
-  $('s2').textContent=td.filter(d=>d.dayScore<=-2.5).length;
-  $('s3').textContent=td.filter(d=>d.dayScore>-2.5&&d.dayScore<2.5).length;
-  $('s4').textContent=td.length;
-  $('s5').textContent=(rows.length/1000).toFixed(1)+'K';
-  $('sum').style.display='grid';
-  renderPicker(allDays);
-  renderCombined(allDays);
-  setProg(100);
-  setSt(`✅ ${allDays.length} days · ${rows.length.toLocaleString()} rows · 10-layer + 9-planet analysis complete · Click any date above`,'ok');
-  const first=allDays.findIndex(d=>d.weekday!=='Saturday'&&d.weekday!=='Sunday');
-  if(first>=0)selectDay(first);
 }
 
 $('fi').addEventListener('change',function(){if(this.files[0])processFile(this.files[0])});
